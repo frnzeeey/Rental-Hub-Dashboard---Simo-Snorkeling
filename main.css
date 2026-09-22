@@ -1,6 +1,6 @@
     body {
             font-family: 'Outfit', sans-serif;
-            background-color: #1f1f1f;
+            background-color: #F4F7F9;
         }
 
         /* Custom Scrollbar */
@@ -9,7 +9,7 @@
             height: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: #182234;
+            background: #f1f5f9;
         }
         ::-webkit-scrollbar-thumb {
             background: #cbd5e1;
