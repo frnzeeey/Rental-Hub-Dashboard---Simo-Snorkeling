@@ -18,16 +18,110 @@
             { name: "Floater", code: "Floater", icon: "disc", totalStock: 15 }
         ];
 
-        // LESSORS DIRECTORY
-        let lessorsDirectory = [
+        // DEFAULT LESSORS DIRECTORY
+        const defaultLessorsDirectory = [
             { id: 1, name: "Coral Bay Watersports", type: "Partner Business", location: "Main Beach Station 1", phone: "0917-123-4567", commission: "Standard Split" },
             { id: 2, name: "Oceanic Gear Station", type: "Partner Business", location: "South Cove Docks", phone: "0918-987-6543", commission: "Standard Split" },
             { id: 3, name: "Capt. Mark (Island Guide)", type: "Individual Lessor", location: "Freelance Harbor", phone: "0920-555-0199", commission: "Standard Split" }
         ];
 
-        // ACTIVE RENTALS DATA
+        let lessorsDirectory = [];
         let rentalsData = [];
         let currentAddGearRentalId = null;
+
+        function loadSavedState() {
+            try {
+                const savedRentals = localStorage.getItem('aquatrack_rentals');
+                const savedLessors = localStorage.getItem('aquatrack_lessors');
+
+                if (savedRentals) {
+                    rentalsData = JSON.parse(savedRentals);
+                } else {
+                    rentalsData = [];
+                }
+
+                if (savedLessors) {
+                    lessorsDirectory = JSON.parse(savedLessors);
+                } else {
+                    lessorsDirectory = [...defaultLessorsDirectory];
+                }
+            } catch (e) {
+                console.warn("Storage error, starting with default state:", e);
+                rentalsData = [];
+                lessorsDirectory = [...defaultLessorsDirectory];
+            }
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem('aquatrack_rentals', JSON.stringify(rentalsData));
+                localStorage.setItem('aquatrack_lessors', JSON.stringify(lessorsDirectory));
+            } catch (e) {
+                console.warn("Storage save error:", e);
+            }
+        }
+
+        function exportToPDF() {
+            if (!window.jspdf) {
+                showToast("PDF generator loading, please try again in a moment.", "warning");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+            // Title Header
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(16);
+            doc.setTextColor(15, 23, 42);
+            doc.text("AquaTrack - Snorkeling Gear Rental Report", 14, 16);
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.setTextColor(100, 116, 139);
+            doc.text(`Generated on: ${new Date().toLocaleString()}  |  Total Records: ${rentalsData.length}`, 14, 23);
+
+            // Summary Totals Banner
+            let totalRev = 0, totalOur = 0, totalLessor = 0;
+            rentalsData.forEach(r => {
+                totalRev += r.totalCustomerPrice || 0;
+                totalOur += r.totalOurShare || 0;
+                totalLessor += r.totalLessorShare || 0;
+            });
+
+            doc.setFillColor(241, 245, 249);
+            doc.roundedRect(14, 26, 269, 12, 2, 2, 'F');
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.setTextColor(13, 148, 136);
+            doc.text(`TOTAL REVENUE: PHP ${totalRev.toLocaleString()}    |    OUR SHARE: PHP ${totalOur.toLocaleString()}    |    LESSOR PAYOUT: PHP ${totalLessor.toLocaleString()}`, 18, 33.5);
+
+            // Transaction Table
+            const tableData = rentalsData.map(r => [
+                r.customer || '-',
+                r.items || '-',
+                r.lessorName || 'In-House',
+                r.deposit || '-',
+                `PHP ${(r.totalCustomerPrice || 0).toLocaleString()}`,
+                `PHP ${(r.totalOurShare || 0).toLocaleString()}`,
+                r.paymentStatus || 'Unpaid',
+                r.status || 'Active',
+                r.dueTime || '-'
+            ]);
+
+            doc.autoTable({
+                startY: 42,
+                head: [['Customer Name', 'Rented Items', 'Lessor Source', 'Deposit Held', 'Total Bill', 'Our Share', 'Payment', 'Status', 'Due Time']],
+                body: tableData,
+                theme: 'striped',
+                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+                bodyStyles: { fontSize: 8, cellPadding: 2.5 },
+                alternateRowStyles: { fillColor: [248, 250, 252] }
+            });
+
+            doc.save(`AquaTrack_Rental_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+            showToast("PDF Report exported successfully!", "success");
+        }
 
         function showToast(message, type = "warning") {
             const container = document.getElementById("toastContainer");
@@ -50,61 +144,248 @@
             }, 3500);
         }
 
-        function computeTransaction(quantities, lessorType) {
-            const M = quantities["Mask"] || 0;
-            const V = quantities["Lifevest"] || 0;
-            const SF = quantities["Short Fins"] || 0;
-            const LF = quantities["Long Fins"] || 0;
-            const GP = quantities["GoPro"] || 0;
-            const FL = quantities["Floater"] || 0;
+        function switchTab(tabName) {
+            const views = ['dashboard', 'inventory', 'lessors'];
+            views.forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                const nav = document.getElementById(`nav-${v}`);
+                if (el) el.classList.add('hidden');
+                if (nav) {
+                    nav.classList.remove('bg-teal-500/10', 'text-teal-400', 'font-semibold', 'border', 'border-teal-500/20');
+                    nav.classList.add('hover:bg-slate-800', 'text-slate-400', 'hover:text-white');
+                }
+            });
 
-            // 1. Total Customer Price is ALWAYS the exact sum of all rented gear unit prices
-            const totalCustomerPrice = (M * 100) + (SF * 150) + (LF * 300) + (V * 100) + (GP * 700) + (FL * 100);
+            const activeView = document.getElementById(`view-${tabName}`);
+            const activeNav = document.getElementById(`nav-${tabName}`);
+            if (activeView) activeView.classList.remove('hidden');
+            if (activeNav) {
+                activeNav.classList.remove('hover:bg-slate-800', 'text-slate-400', 'hover:text-white');
+                activeNav.classList.add('bg-teal-500/10', 'text-teal-400', 'font-semibold', 'border', 'border-teal-500/20');
+            }
 
-            // 2. UNIVERSAL 3-GEAR SET BUNDLE (Any 3 basic gear items: Mask, Vest, Short Fins = 1 Set)
+            const titles = {
+                'dashboard': 'Rental Dashboard',
+                'inventory': 'Gear Inventory Management',
+                'lessors': 'Third-Party & Freelance Lessors Directory'
+            };
+            const titleEl = document.getElementById('pageTitle');
+            if (titleEl && titles[tabName]) titleEl.textContent = titles[tabName];
+        }
+
+        function openRentalModal() {
+            const modal = document.getElementById('rentalModal');
+            if (modal) modal.classList.remove('hidden');
+            populatePartnerDropdown();
+            toggleLessorFields();
+            updatePreview();
+        }
+
+        function closeRentalModal() {
+            const modal = document.getElementById('rentalModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function openAddGearModal(id) {
+            currentAddGearRentalId = id;
+            const record = rentalsData.find(r => r.id === id);
+            if (!record) return;
+
+            const modal = document.getElementById('addGearModal');
+            const subtitle = document.getElementById('addGearCustomerSubtitle');
+            const itemsDisplay = document.getElementById('currentRentedItemsDisplay');
+
+            if (subtitle) subtitle.textContent = `Adding gear for guest: ${record.customer}`;
+            if (itemsDisplay) itemsDisplay.textContent = record.items || 'None';
+
+            Object.keys(GEAR_PRICING_RULES).forEach(name => {
+                const chk = document.getElementById(`addChk-${name}`);
+                const qty = document.getElementById(`addQty-${name}`);
+                if (chk) chk.checked = false;
+                if (qty) qty.value = 0;
+            });
+
+            if (modal) modal.classList.remove('hidden');
+            updateAddGearPreview();
+        }
+
+        function closeAddGearModal() {
+            const modal = document.getElementById('addGearModal');
+            if (modal) modal.classList.add('hidden');
+            currentAddGearRentalId = null;
+        }
+
+        function openLessorModal() {
+            const modal = document.getElementById('addLessorModal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeLessorModal() {
+            const modal = document.getElementById('addLessorModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function openEditLessorModal(id) {
+            const lessor = lessorsDirectory.find(l => l.id === id);
+            if (!lessor) return;
+
+            document.getElementById('editLessorId').value = lessor.id;
+            document.getElementById('editLessorName').value = lessor.name;
+            document.getElementById('editLessorType').value = lessor.type;
+            document.getElementById('editLessorLocation').value = lessor.location || '';
+            document.getElementById('editLessorPhone').value = lessor.phone || '';
+            document.getElementById('editLessorCommission').value = lessor.commission || '';
+
+            const modal = document.getElementById('editLessorModal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeEditLessorModal() {
+            const modal = document.getElementById('editLessorModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function populatePartnerDropdown() {
+            const partnerSelect = document.getElementById('partnerLessorSelect');
+            if (!partnerSelect) return;
+
+            partnerSelect.innerHTML = '';
+            const partnerLessors = lessorsDirectory.filter(l => l.type === 'Partner Business');
+
+            if (partnerLessors.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = "";
+                opt.textContent = "No Partner Businesses Registered (Add one in Directory)";
+                partnerSelect.appendChild(opt);
+                return;
+            }
+
+            partnerLessors.forEach(l => {
+                const option = document.createElement('option');
+                option.value = l.name;
+                option.textContent = `${l.name} (${l.location || 'Partner'})`;
+                partnerSelect.appendChild(option);
+            });
+        }
+
+        function toggleLessorFields() {
+            const partnerRadio = document.querySelector('input[name="lessorTypeRadio"][value="Partner Business"]');
+            const customRadio = document.querySelector('input[name="lessorTypeRadio"][value="Individual Lessor"]');
+
+            const partnerContainer = document.getElementById('partnerLessorContainer');
+            const customContainer = document.getElementById('customLessorContainer');
+
+            if (partnerContainer) partnerContainer.classList.toggle('hidden', !partnerRadio?.checked);
+            if (customContainer) customContainer.classList.toggle('hidden', !customRadio?.checked);
+
+            if (partnerRadio?.checked) {
+                populatePartnerDropdown();
+            }
+            updatePreview();
+        }
+
+        function handleCheckboxChange(gearName) {
+            const chk = document.getElementById(`chk-${gearName}`);
+            const qtyInput = document.getElementById(`qty-${gearName}`);
+            if (chk && qtyInput) {
+                if (chk.checked && parseInt(qtyInput.value) === 0) {
+                    qtyInput.value = 1;
+                } else if (!chk.checked) {
+                    qtyInput.value = 0;
+                }
+            }
+            updatePreview();
+        }
+
+        function handleQuantityInput(gearName) {
+            const chk = document.getElementById(`chk-${gearName}`);
+            const qtyInput = document.getElementById(`qty-${gearName}`);
+            if (chk && qtyInput) {
+                const val = parseInt(qtyInput.value) || 0;
+                chk.checked = val > 0;
+            }
+            updatePreview();
+        }
+
+        function handleAddGearCheckboxChange(gearName) {
+            const chk = document.getElementById(`addChk-${gearName}`);
+            const qtyInput = document.getElementById(`addQty-${gearName}`);
+            if (chk && qtyInput) {
+                if (chk.checked && parseInt(qtyInput.value) === 0) {
+                    qtyInput.value = 1;
+                } else if (!chk.checked) {
+                    qtyInput.value = 0;
+                }
+            }
+            updateAddGearPreview();
+        }
+
+        function handleAddGearQuantityInput(gearName) {
+            const chk = document.getElementById(`addChk-${gearName}`);
+            const qtyInput = document.getElementById(`addQty-${gearName}`);
+            if (chk && qtyInput) {
+                const val = parseInt(qtyInput.value) || 0;
+                chk.checked = val > 0;
+            }
+            updateAddGearPreview();
+        }
+
+        function resetRentalFormQuantities() {
+            Object.keys(GEAR_PRICING_RULES).forEach(name => {
+                const chk = document.getElementById(`chk-${name}`);
+                const qty = document.getElementById(`qty-${name}`);
+                if (chk) chk.checked = false;
+                if (qty) qty.value = 0;
+            });
+            updatePreview();
+        }
+
+        function computeTransaction(itemQuantities, lessorType) {
+            let totalCustomerPrice = 0;
+
+            Object.keys(GEAR_PRICING_RULES).forEach(key => {
+                const q = itemQuantities[key] || 0;
+                totalCustomerPrice += q * GEAR_PRICING_RULES[key].price;
+            });
+
+            const M = itemQuantities["Mask"] || 0;
+            const V = itemQuantities["Lifevest"] || 0;
+            const SF = itemQuantities["Short Fins"] || 0;
+            const LF = itemQuantities["Long Fins"] || 0;
+            const GP = itemQuantities["GoPro"] || 0;
+            const FL = itemQuantities["Floater"] || 0;
+
+            // Set bundle rule: Any combination of 3 items from Mask, Lifevest, Short Fins
             const totalBundleGearCount = M + V + SF;
             const totalSets = Math.floor(totalBundleGearCount / 3);
-
-            let itemsNeededForSets = totalSets * 3;
-
-            let remSF = SF;
-            let remM = M;
-            let remV = V;
-
-            // Deduct items consumed to form sets (Short Fins, Mask, Lifevest)
-            const takeSF = Math.min(remSF, itemsNeededForSets);
-            remSF -= takeSF;
-            itemsNeededForSets -= takeSF;
-
-            const takeM = Math.min(remM, itemsNeededForSets);
-            remM -= takeM;
-            itemsNeededForSets -= takeM;
-
-            const takeV = Math.min(remV, itemsNeededForSets);
-            remV -= takeV;
-            itemsNeededForSets -= takeV;
+            const remBundleItems = totalBundleGearCount % 3;
 
             let totalOurShare = 0;
             let totalLessorShare = 0;
 
             if (lessorType === "In-House") {
-                // In-House Hub: 100% of customer price is revenue to our shop
                 totalOurShare = totalCustomerPrice;
                 totalLessorShare = 0;
             } else {
-                // Partner or Individual Lessor:
-                // Each complete 3-gear set yields ₱100 Our Share
                 totalOurShare += totalSets * 100;
 
-                // Remaining individual items (and all Long Fins, GoPro, Floater) yield standard commission rates:
-                totalOurShare += (remM * 50) + 
-                                 (remSF * 50) + 
-                                 (LF * 150) + 
-                                 (remV * 50) + 
-                                 (GP * 400) + 
-                                 (FL * 50);
+                let remM = M, remV = V, remSF = SF;
+                const deductItem = (type, share) => {
+                    if (type === "Mask" && remM > 0) { remM--; totalOurShare += share; return true; }
+                    if (type === "Vest" && remV > 0) { remV--; totalOurShare += share; return true; }
+                    if (type === "SF" && remSF > 0) { remSF--; totalOurShare += share; return true; }
+                    return false;
+                };
 
-                // Lessor Payout Share is precisely Customer Total minus Our Commission Share
+                for (let i = 0; i < remBundleItems; i++) {
+                    if (!deductItem("Mask", 50)) {
+                        if (!deductItem("Vest", 50)) {
+                            deductItem("SF", 50);
+                        }
+                    }
+                }
+
+                totalOurShare += (LF * 150) + (GP * 400) + (FL * 50);
                 totalLessorShare = Math.max(0, totalCustomerPrice - totalOurShare);
             }
 
@@ -113,124 +394,76 @@
                 totalOurShare,
                 totalLessorShare,
                 totalSets,
-                remMask: remM,
-                remVest: remV,
-                remShortFins: remSF,
+                remMask: M,
+                remVest: V,
+                remShortFins: SF,
                 remLongFins: LF,
                 goProQty: GP,
                 floaterQty: FL
             };
         }
 
-        function openRentalModal() {
-            populatePartnerDropdown();
-            resetRentalFormQuantities();
-            calculateModalPricing();
-            document.getElementById('rentalModal').classList.remove('hidden');
-        }
-
-        function closeRentalModal() {
-            document.getElementById('rentalModal').classList.add('hidden');
-        }
-
-        function populatePartnerDropdown() {
-            const select = document.getElementById('partnerLessorSelect');
-            if (!select) return;
-            select.innerHTML = '';
-            const partners = lessorsDirectory.filter(l => l.type === 'Partner Business');
-            
-            if (partners.length === 0) {
-                const opt = document.createElement('option');
-                opt.value = "Default Partner Shop";
-                opt.innerText = "Default Partner Shop";
-                select.appendChild(opt);
-            } else {
-                partners.forEach(p => {
-                    const opt = document.createElement('option');
-                    opt.value = p.name;
-                    opt.innerText = `${p.name} (${p.location})`;
-                    select.appendChild(opt);
-                });
-            }
-        }
-
-        function resetRentalFormQuantities() {
-            Object.keys(GEAR_PRICING_RULES).forEach(name => {
-                const chk = document.getElementById(`chk-${name}`);
-                const qtyInput = document.getElementById(`qty-${name}`);
-                if (chk) chk.checked = false;
-                if (qtyInput) qtyInput.value = 0;
-            });
-            calculateModalPricing();
-        }
-
-        function handleCheckboxChange(itemName) {
-            const chk = document.getElementById(`chk-${itemName}`);
-            const qtyInput = document.getElementById(`qty-${itemName}`);
-            if (!chk || !qtyInput) return;
-
-            if (chk.checked) {
-                if (parseInt(qtyInput.value) <= 0 || !qtyInput.value) {
-                    qtyInput.value = 1;
-                }
-            } else {
-                qtyInput.value = 0;
-            }
-            calculateModalPricing();
-        }
-
-        function handleQuantityInput(itemName) {
-            const chk = document.getElementById(`chk-${itemName}`);
-            const qtyInput = document.getElementById(`qty-${itemName}`);
-            if (!chk || !qtyInput) return;
-
-            const val = parseInt(qtyInput.value) || 0;
-            chk.checked = val > 0;
-            calculateModalPricing();
-        }
-
-        function toggleLessorFields() {
-            const selectedTypeElem = document.querySelector('input[name="lessorTypeRadio"]:checked');
-            const selectedType = selectedTypeElem ? selectedTypeElem.value : 'In-House';
-            const partnerContainer = document.getElementById('partnerLessorContainer');
-            const customContainer = document.getElementById('customLessorContainer');
-
-            if (selectedType === 'Partner Business') {
-                partnerContainer.classList.remove('hidden');
-                customContainer.classList.add('hidden');
-            } else if (selectedType === 'Individual Lessor') {
-                partnerContainer.classList.add('hidden');
-                customContainer.classList.remove('hidden');
-            } else {
-                partnerContainer.classList.add('hidden');
-                customContainer.classList.add('hidden');
-            }
-            calculateModalPricing();
-        }
-
-        function calculateModalPricing() {
-            const quantities = {};
+        function updatePreview() {
+            const itemQuantities = {};
             Object.keys(GEAR_PRICING_RULES).forEach(name => {
                 const qtyInput = document.getElementById(`qty-${name}`);
-                quantities[name] = qtyInput ? parseInt(qtyInput.value) || 0 : 0;
+                itemQuantities[name] = qtyInput ? parseInt(qtyInput.value) || 0 : 0;
             });
 
             const lessorTypeRadio = document.querySelector('input[name="lessorTypeRadio"]:checked');
             const lessorType = lessorTypeRadio ? lessorTypeRadio.value : 'In-House';
 
-            const breakdown = computeTransaction(quantities, lessorType);
+            const breakdown = computeTransaction(itemQuantities, lessorType);
 
-            document.getElementById('previewTotalPrice').innerText = `₱${breakdown.totalCustomerPrice.toLocaleString()}`;
-            document.getElementById('previewOurShare').innerText = `₱${breakdown.totalOurShare.toLocaleString()}`;
-            document.getElementById('previewLessorShare').innerText = `₱${breakdown.totalLessorShare.toLocaleString()}`;
+            const prevPrice = document.getElementById('previewTotalPrice');
+            const prevOur = document.getElementById('previewOurShare');
+            const prevLessor = document.getElementById('previewLessorShare');
+            const setBanner = document.getElementById('setDiscountBanner');
+            const setText = document.getElementById('setTextBanner');
 
-            const banner = document.getElementById('setDiscountBanner');
-            if (breakdown.totalSets > 0) {
-                banner.classList.remove('hidden');
-                document.getElementById('setTextBanner').innerText = `${breakdown.totalSets} Set Bundle(s) Detected!`;
-            } else {
-                banner.classList.add('hidden');
+            if (prevPrice) prevPrice.textContent = `₱${breakdown.totalCustomerPrice.toLocaleString()}`;
+            if (prevOur) prevOur.textContent = `₱${breakdown.totalOurShare.toLocaleString()}`;
+            if (prevLessor) prevLessor.textContent = `₱${breakdown.totalLessorShare.toLocaleString()}`;
+
+            if (setBanner) {
+                if (breakdown.totalSets > 0 && lessorType !== "In-House") {
+                    setBanner.classList.remove('hidden');
+                    if (setText) setText.textContent = `${breakdown.totalSets} Set(s) Active! (₱100 Our Share per 3-gear combo applied)`;
+                } else {
+                    setBanner.classList.add('hidden');
+                }
             }
+        }
+
+        function updateAddGearPreview() {
+            if (!currentAddGearRentalId) return;
+            const record = rentalsData.find(r => r.id === currentAddGearRentalId);
+            if (!record) return;
+
+            const addedQuantities = {};
+            let totalAddedPrice = 0;
+
+            Object.keys(GEAR_PRICING_RULES).forEach(name => {
+                const qtyInput = document.getElementById(`addQty-${name}`);
+                const addQty = qtyInput ? parseInt(qtyInput.value) || 0 : 0;
+                addedQuantities[name] = addQty;
+                totalAddedPrice += addQty * GEAR_PRICING_RULES[name].price;
+            });
+
+            const combinedQuantities = {};
+            Object.keys(GEAR_PRICING_RULES).forEach(name => {
+                combinedQuantities[name] = (record.itemQuantities?.[name] || 0) + (addedQuantities[name] || 0);
+            });
+
+            const newBreakdown = computeTransaction(combinedQuantities, record.lessorType);
+
+            const curEl = document.getElementById('addGearCurrentTotal');
+            const addEl = document.getElementById('addGearAddedTotal');
+            const newEl = document.getElementById('addGearNewTotal');
+
+            if (curEl) curEl.textContent = `₱${(record.totalCustomerPrice || 0).toLocaleString()}`;
+            if (addEl) addEl.textContent = `+₱${totalAddedPrice.toLocaleString()}`;
+            if (newEl) newEl.textContent = `₱${newBreakdown.totalCustomerPrice.toLocaleString()}`;
         }
 
         function handleRentalSubmit(event) {
@@ -287,7 +520,6 @@
 
             const pricingBreakdown = computeTransaction(itemQuantities, lessorType);
 
-            // Format Item String
             const formattedParts = [];
             if (pricingBreakdown.totalSets > 0) formattedParts.push(`Gear Set x${pricingBreakdown.totalSets}`);
             if (pricingBreakdown.remMask > 0) formattedParts.push(`Mask x${pricingBreakdown.remMask}`);
@@ -314,6 +546,7 @@
             };
 
             rentalsData.unshift(newRecord);
+            saveState();
             updateKPIs();
             filterTable();
             renderInventoryGrid();
@@ -324,79 +557,6 @@
             resetRentalFormQuantities();
             toggleLessorFields();
             showToast("Rental order issued successfully!", "success");
-        }
-
-        function openAddGearModal(id) {
-            const record = rentalsData.find(r => r.id === id);
-            if (!record) return;
-
-            currentAddGearRentalId = id;
-
-            document.getElementById('addGearCustomerSubtitle').innerText = `Adding to ${record.customer} (${record.lessorName})`;
-            document.getElementById('currentRentedItemsDisplay').innerText = record.items || 'None';
-
-            Object.keys(GEAR_PRICING_RULES).forEach(name => {
-                const chk = document.getElementById(`addChk-${name}`);
-                const qtyInput = document.getElementById(`addQty-${name}`);
-                if (chk) chk.checked = false;
-                if (qtyInput) qtyInput.value = 0;
-            });
-
-            document.getElementById('addGearCurrentTotal').innerText = `₱${record.totalCustomerPrice.toLocaleString()}`;
-            document.getElementById('addGearAddedTotal').innerText = `+₱0`;
-            document.getElementById('addGearNewTotal').innerText = `₱${record.totalCustomerPrice.toLocaleString()}`;
-
-            document.getElementById('addGearModal').classList.remove('hidden');
-        }
-
-        function closeAddGearModal() {
-            document.getElementById('addGearModal').classList.add('hidden');
-            currentAddGearRentalId = null;
-        }
-
-        function handleAddGearCheckboxChange(itemName) {
-            const chk = document.getElementById(`addChk-${itemName}`);
-            const qtyInput = document.getElementById(`addQty-${itemName}`);
-            if (!chk || !qtyInput) return;
-
-            if (chk.checked) {
-                if (parseInt(qtyInput.value) <= 0 || !qtyInput.value) {
-                    qtyInput.value = 1;
-                }
-            } else {
-                qtyInput.value = 0;
-            }
-            calculateAddGearLivePricing();
-        }
-
-        function handleAddGearQuantityInput(itemName) {
-            const chk = document.getElementById(`addChk-${itemName}`);
-            const qtyInput = document.getElementById(`addQty-${itemName}`);
-            if (!chk || !qtyInput) return;
-
-            const val = parseInt(qtyInput.value) || 0;
-            chk.checked = val > 0;
-            calculateAddGearLivePricing();
-        }
-
-        function calculateAddGearLivePricing() {
-            if (!currentAddGearRentalId) return;
-            const record = rentalsData.find(r => r.id === currentAddGearRentalId);
-            if (!record) return;
-
-            const tempCombinedQuantities = {};
-            Object.keys(GEAR_PRICING_RULES).forEach(name => {
-                const existingQty = (record.itemQuantities && record.itemQuantities[name]) ? record.itemQuantities[name] : 0;
-                const addQtyInput = document.getElementById(`addQty-${name}`);
-                const addQty = addQtyInput ? parseInt(addQtyInput.value) || 0 : 0;
-                tempCombinedQuantities[name] = existingQty + addQty;
-            });
-
-            const updatedBreakdown = computeTransaction(tempCombinedQuantities, record.lessorType);
-            const addedValue = updatedBreakdown.totalCustomerPrice - record.totalCustomerPrice;
-
-            document.getElementById('addGearAddedTotal').innerText = `+₱${Math.max(0, addedValue).toLocaleString()}`;
-            document.getElementById('addGearNewTotal').innerText = `₱${updatedBreakdown.totalCustomerPrice.toLocaleString()}`;
         }
 
         function handleAddGearSubmit(event) {
@@ -441,20 +601,13 @@
             record.totalOurShare = pricingBreakdown.totalOurShare;
             record.totalLessorShare = pricingBreakdown.totalLessorShare;
 
+            saveState();
             updateKPIs();
             filterTable();
             renderInventoryGrid();
             renderLessorsGrid();
             closeAddGearModal();
             showToast("Additional gear appended to order!", "success");
-        }
-
-        function openLessorModal() {
-            document.getElementById('addLessorModal').classList.remove('hidden');
-        }
-
-        function closeLessorModal() {
-            document.getElementById('addLessorModal').classList.add('hidden');
         }
 
         function handleNewLessorSubmit(event) {
@@ -476,268 +629,11 @@
                 commission
             });
 
+            saveState();
             renderLessorsGrid();
             populatePartnerDropdown();
             closeLessorModal();
             showToast("New lessor registered!", "success");
-        }
-
-        function filterTable() {
-            const search = document.getElementById('searchInput').value.toLowerCase();
-            const statusF = document.getElementById('statusFilter').value;
-            const paymentF = document.getElementById('paymentFilter').value;
-
-            const tbody = document.getElementById('rentalsTableBody');
-            const emptyState = document.getElementById('emptyTableState');
-            if (!tbody || !emptyState) return;
-
-            tbody.innerHTML = '';
-
-            const filtered = rentalsData.filter(item => {
-                const matchSearch = item.customer.toLowerCase().includes(search) || item.items.toLowerCase().includes(search) || item.lessorName.toLowerCase().includes(search);
-                const matchStatus = statusF === 'ALL' || item.status === statusF;
-                const matchPayment = paymentF === 'ALL' || item.paymentStatus === paymentF;
-                return matchSearch && matchStatus && matchPayment;
-            });
-
-            if (filtered.length === 0) {
-                emptyState.classList.remove('hidden');
-            } else {
-                emptyState.classList.add('hidden');
-            }
-
-            filtered.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50/80 transition-colors border-b border-slate-100";
-
-                let statusClass = "bg-slate-100 text-slate-700 border-slate-200";
-                if (item.status === 'Active') statusClass = "bg-sky-50 text-sky-700 border-sky-200 font-semibold";
-                else if (item.status === 'Returned') statusClass = "bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold";
-                else if (item.status === 'Overdue') statusClass = "bg-amber-50 text-amber-700 border-amber-200 font-bold";
-                else if (item.status === 'Damaged') statusClass = "bg-red-50 text-red-700 border-red-200 font-bold";
-
-                let lessorBadgeClass = "bg-slate-100 text-slate-700 border-slate-200";
-                if (item.lessorType === "Partner Business") lessorBadgeClass = "bg-purple-50 text-purple-700 border-purple-200 font-semibold";
-                else if (item.lessorType === "Individual Lessor") lessorBadgeClass = "bg-sky-50 text-sky-800 border-sky-200 font-semibold";
-
-                tr.innerHTML = `
-                    <td class="py-4 px-5 font-bold text-slate-900">${item.customer}</td>
-                    <td class="py-4 px-5">
-                        <span class="font-medium text-slate-800 block">${item.items}</span>
-                        <span class="text-[10px] text-slate-400 block">Due by ${item.dueTime}</span>
-                    </td>
-                    <td class="py-4 px-5">
-                        <span class="inline-flex items-center text-[11px] px-2.5 py-0.5 rounded-full border ${lessorBadgeClass}">
-                            ${item.lessorName}
-                        </span>
-                    </td>
-                    <td class="py-4 px-5">
-                        <span class="bg-slate-100 text-slate-700 font-medium text-[11px] px-2 py-1 rounded-md border border-slate-200">
-                            ${item.deposit}
-                        </span>
-                    </td>
-                    <td class="py-4 px-5 font-extrabold text-slate-900">₱${item.totalCustomerPrice.toLocaleString()}</td>
-                    <td class="py-4 px-5 font-bold text-teal-600">₱${item.totalOurShare.toLocaleString()}</td>
-                    <td class="py-4 px-5">
-                        <select onchange="updatePaymentStatus(${item.id}, this.value)" class="text-[11px] font-bold px-2 py-0.5 rounded-md border cursor-pointer ${item.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}">
-                            <option value="Paid" ${item.paymentStatus === 'Paid' ? 'selected' : ''}>Paid</option>
-                            <option value="Unpaid" ${item.paymentStatus === 'Unpaid' ? 'selected' : ''}>Unpaid</option>
-                        </select>
-                    </td>
-                    <td class="py-4 px-5">
-                        <select onchange="updateStatus(${item.id}, this.value)" class="text-[11px] font-bold px-2 py-0.5 rounded-md border cursor-pointer ${statusClass}">
-                            <option value="Active" ${item.status === 'Active' ? 'selected' : ''}>Active</option>
-                            <option value="Returned" ${item.status === 'Returned' ? 'selected' : ''}>Returned</option>
-                            <option value="Overdue" ${item.status === 'Overdue' ? 'selected' : ''}>Overdue</option>
-                            <option value="Damaged" ${item.status === 'Damaged' ? 'selected' : ''}>Damaged</option>
-                        </select>
-                    </td>
-                    <td class="py-4 px-5 text-right flex items-center justify-end space-x-1.5">
-                        <button onclick="openAddGearModal(${item.id})" class="inline-flex items-center space-x-1 px-2 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 font-bold text-[11px] rounded-lg transition-colors border border-teal-200">
-                            <i data-lucide="plus-circle" class="w-3 h-3"></i>
-                            <span>+ Gear</span>
-                        </button>
-                        <button onclick="deleteRental(${item.id})" class="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-colors" title="Delete Record">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            if (window.lucide) lucide.createIcons();
-        }
-
-        function updateStatus(id, newStatus) {
-            const item = rentalsData.find(r => r.id === id);
-            if (item) {
-                item.status = newStatus;
-                updateKPIs();
-                renderInventoryGrid();
-                filterTable();
-            }
-        }
-
-        function updatePaymentStatus(id, newStatus) {
-            const item = rentalsData.find(r => r.id === id);
-            if (item) {
-                item.paymentStatus = newStatus;
-                updateKPIs();
-                filterTable();
-            }
-        }
-
-        function deleteRental(id) {
-            rentalsData = rentalsData.filter(r => r.id !== id);
-            updateKPIs();
-            renderInventoryGrid();
-            filterTable();
-            showToast("Rental record removed.", "info");
-        }
-
-        function updateKPIs() {
-            const activeRentals = rentalsData.filter(r => r.status === 'Active');
-            const overdueRentals = rentalsData.filter(r => r.status === 'Overdue');
-
-            let totalRev = 0;
-            let totalOur = 0;
-            let totalLessor = 0;
-
-            rentalsData.forEach(r => {
-                totalRev += r.totalCustomerPrice;
-                totalOur += r.totalOurShare;
-                totalLessor += r.totalLessorShare;
-            });
-
-            document.getElementById('kpiActiveRentals').innerText = activeRentals.length;
-            document.getElementById('kpiOverdue').innerText = overdueRentals.length;
-            document.getElementById('kpiTotalRevenue').innerText = `₱${totalRev.toLocaleString()}`;
-            document.getElementById('kpiOurShare').innerText = `₱${totalOur.toLocaleString()}`;
-            document.getElementById('kpiLessorPayoutSub').innerText = `₱${totalLessor.toLocaleString()} payout to lessors`;
-        }
-
-        function renderInventoryGrid() {
-            const container = document.getElementById('inventoryGrid');
-            if (!container) return;
-            container.innerHTML = '';
-
-            const activeOutCounts = {};
-            gearStockDirectory.forEach(g => activeOutCounts[g.code] = 0);
-
-            rentalsData.filter(r => r.status === 'Active' || r.status === 'Overdue').forEach(r => {
-                if (r.itemQuantities) {
-                    Object.keys(r.itemQuantities).forEach(code => {
-                        activeOutCounts[code] = (activeOutCounts[code] || 0) + r.itemQuantities[code];
-                    });
-                }
-            });
-
-            gearStockDirectory.forEach(gear => {
-                const outCount = activeOutCounts[gear.code] || 0;
-                const available = Math.max(0, gear.totalStock - outCount);
-
-                const card = document.createElement('div');
-                card.className = "bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3";
-                card.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-2.5">
-                            <div class="p-2 bg-teal-50 text-teal-600 rounded-xl">
-                                <i data-lucide="${gear.icon}" class="w-5 h-5"></i>
-                            </div>
-                            <h4 class="font-bold text-slate-800 text-sm">${gear.name}</h4>
-                        </div>
-                        <span class="text-xs font-bold text-slate-400">Total: ${gear.totalStock}</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 text-center">
-                        <div class="bg-emerald-50/60 p-2 rounded-xl border border-emerald-100">
-                            <span class="text-[10px] uppercase font-bold text-emerald-600 block">Available</span>
-                            <span class="text-lg font-extrabold text-emerald-700">${available}</span>
-                        </div>
-                        <div class="bg-sky-50/60 p-2 rounded-xl border border-sky-100">
-                            <span class="text-[10px] uppercase font-bold text-sky-600 block">Active Out</span>
-                            <span class="text-lg font-extrabold text-sky-700">${outCount}</span>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-
-            if (window.lucide) lucide.createIcons();
-        }
-
-        function renderLessorsGrid() {
-            const container = document.getElementById('lessorsGrid');
-            if (!container) return;
-            container.innerHTML = '';
-
-            lessorsDirectory.forEach(lessor => {
-                const card = document.createElement('div');
-                card.className = "bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3 flex flex-col justify-between";
-
-                let typeBadge = "bg-purple-50 text-purple-700 border-purple-200";
-                if (lessor.type === "Individual Lessor") typeBadge = "bg-sky-50 text-sky-700 border-sky-200";
-
-                card.innerHTML = `
-                    <div class="space-y-3">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <h4 class="font-bold text-slate-900 text-sm">${lessor.name}</h4>
-                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${typeBadge} mt-1 inline-block">
-                                    ${lessor.type}
-                                </span>
-                            </div>
-                            <div class="p-2 bg-slate-50 text-slate-400 rounded-xl">
-                                <i data-lucide="store" class="w-4 h-4"></i>
-                            </div>
-                        </div>
-
-                        <div class="space-y-1 text-xs text-slate-500 pt-1 border-t border-slate-100">
-                            <p class="flex items-center gap-1.5">
-                                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400"></i> ${lessor.location}
-                            </p>
-                            <p class="flex items-center gap-1.5">
-                                <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i> ${lessor.phone}
-                            </p>
-                            <p class="flex items-center gap-1.5 text-[11px] text-slate-400">
-                                <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-400"></i> ${lessor.commission || 'Standard Split'}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="pt-2 border-t border-slate-100 flex items-center justify-end space-x-2">
-                        <button onclick="openEditLessorModal(${lessor.id})" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg transition-colors border border-slate-200 cursor-pointer">
-                            <i data-lucide="edit-2" class="w-3 h-3"></i>
-                            <span>Edit</span>
-                        </button>
-                        <button onclick="deleteLessor(${lessor.id})" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-[11px] rounded-lg transition-colors border border-red-200 cursor-pointer">
-                            <i data-lucide="trash-2" class="w-3 h-3"></i>
-                            <span>Delete</span>
-                        </button>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-
-            if (window.lucide) lucide.createIcons();
-        }
-
-        function openEditLessorModal(id) {
-            const lessor = lessorsDirectory.find(l => l.id === id);
-            if (!lessor) return;
-
-            document.getElementById('editLessorId').value = lessor.id;
-            document.getElementById('editLessorName').value = lessor.name;
-            document.getElementById('editLessorType').value = lessor.type;
-            document.getElementById('editLessorLocation').value = lessor.location;
-            document.getElementById('editLessorPhone').value = lessor.phone;
-            document.getElementById('editLessorCommission').value = lessor.commission || 'Standard Split';
-
-            document.getElementById('editLessorModal').classList.remove('hidden');
-        }
-
-        function closeEditLessorModal() {
-            document.getElementById('editLessorModal').classList.add('hidden');
         }
 
         function handleEditLessorSubmit(event) {
@@ -761,7 +657,6 @@
             lessor.phone = newPhone;
             lessor.commission = newCommission;
 
-            // Sync rental records referencing the old name
             rentalsData.forEach(r => {
                 if (r.lessorName === oldName) {
                     r.lessorName = newName;
@@ -769,6 +664,7 @@
                 }
             });
 
+            saveState();
             renderLessorsGrid();
             populatePartnerDropdown();
             filterTable();
@@ -776,11 +672,40 @@
             showToast("Lessor details updated successfully!", "success");
         }
 
+        function updateStatus(id, newStatus) {
+            const item = rentalsData.find(r => r.id === id);
+            if (item) {
+                item.status = newStatus;
+                saveState();
+                updateKPIs();
+                renderInventoryGrid();
+                filterTable();
+            }
+        }
+
+        function updatePaymentStatus(id, newStatus) {
+            const item = rentalsData.find(r => r.id === id);
+            if (item) {
+                item.paymentStatus = newStatus;
+                saveState();
+                updateKPIs();
+                filterTable();
+            }
+        }
+
+        function deleteRental(id) {
+            rentalsData = rentalsData.filter(r => r.id !== id);
+            saveState();
+            updateKPIs();
+            renderInventoryGrid();
+            filterTable();
+            showToast("Rental record removed.", "info");
+        }
+
         function deleteLessor(id) {
             const lessor = lessorsDirectory.find(l => l.id === id);
             if (!lessor) return;
 
-            // Guardrail: check active/recent rental references
             const activeRentalsCount = rentalsData.filter(r => r.lessorName === lessor.name).length;
             if (activeRentalsCount > 0) {
                 showToast(`Cannot delete ${lessor.name}: active in ${activeRentalsCount} rental transaction(s).`, "warning");
@@ -788,37 +713,224 @@
             }
 
             lessorsDirectory = lessorsDirectory.filter(l => l.id !== id);
+            saveState();
             renderLessorsGrid();
             populatePartnerDropdown();
             showToast(`Lessor "${lessor.name}" removed from directory.`, "info");
         }
 
-        function switchTab(tab) {
-            document.getElementById('view-dashboard').classList.add('hidden');
-            document.getElementById('view-inventory').classList.add('hidden');
-            document.getElementById('view-lessors').classList.add('hidden');
+        function updateKPIs() {
+            let activeRentalsCount = 0;
+            let overdueCount = 0;
+            let totalRevenue = 0;
+            let totalOurShare = 0;
+            let totalLessorShare = 0;
 
-            document.getElementById('nav-dashboard').className = "flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-all";
-            document.getElementById('nav-inventory').className = "flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-all";
-            document.getElementById('nav-lessors').className = "flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-all";
+            rentalsData.forEach(r => {
+                if (r.status === 'Active') activeRentalsCount++;
+                if (r.status === 'Overdue') overdueCount++;
+                totalRevenue += r.totalCustomerPrice || 0;
+                totalOurShare += r.totalOurShare || 0;
+                totalLessorShare += r.totalLessorShare || 0;
+            });
 
-            if (tab === 'dashboard') {
-                document.getElementById('view-dashboard').classList.remove('hidden');
-                document.getElementById('nav-dashboard').className = "flex items-center space-x-3 px-3.5 py-2.5 rounded-xl bg-teal-500/10 text-teal-400 font-semibold border border-teal-500/20 transition-all";
-                document.getElementById('pageTitle').innerText = "Rental Dashboard";
-            } else if (tab === 'inventory') {
-                document.getElementById('view-inventory').classList.remove('hidden');
-                document.getElementById('nav-inventory').className = "flex items-center space-x-3 px-3.5 py-2.5 rounded-xl bg-teal-500/10 text-teal-400 font-semibold border border-teal-500/20 transition-all";
-                document.getElementById('pageTitle').innerText = "Equipment Inventory";
-            } else if (tab === 'lessors') {
-                document.getElementById('view-lessors').classList.remove('hidden');
-                document.getElementById('nav-lessors').className = "flex items-center space-x-3 px-3.5 py-2.5 rounded-xl bg-teal-500/10 text-teal-400 font-semibold border border-teal-500/20 transition-all";
-                document.getElementById('pageTitle').innerText = "Lessors Directory";
-            }
+            const kpiActive = document.getElementById('kpiActiveRentals');
+            const kpiOverdue = document.getElementById('kpiOverdue');
+            const kpiRevenue = document.getElementById('kpiTotalRevenue');
+            const kpiOur = document.getElementById('kpiOurShare');
+            const kpiLessorSub = document.getElementById('kpiLessorPayoutSub');
+
+            if (kpiActive) kpiActive.textContent = activeRentalsCount;
+            if (kpiOverdue) kpiOverdue.textContent = overdueCount;
+            if (kpiRevenue) kpiRevenue.textContent = `₱${totalRevenue.toLocaleString()}`;
+            if (kpiOur) kpiOur.textContent = `₱${totalOurShare.toLocaleString()}`;
+            if (kpiLessorSub) kpiLessorSub.textContent = `₱${totalLessorShare.toLocaleString()} payout to lessors`;
         }
 
-        // INITIALIZE ON WINDOW LOAD
+        function filterTable() {
+            const searchVal = (document.getElementById('searchInput')?.value || '').toLowerCase();
+            const statusVal = document.getElementById('statusFilter')?.value || 'ALL';
+            const paymentVal = document.getElementById('paymentFilter')?.value || 'ALL';
+
+            const filtered = rentalsData.filter(r => {
+                const matchesSearch = (r.customer || '').toLowerCase().includes(searchVal) || 
+                                      (r.items || '').toLowerCase().includes(searchVal) || 
+                                      (r.lessorName || '').toLowerCase().includes(searchVal);
+                const matchesStatus = statusVal === 'ALL' || r.status === statusVal;
+                const matchesPayment = paymentVal === 'ALL' || r.paymentStatus === paymentVal;
+                return matchesSearch && matchesStatus && matchesPayment;
+            });
+
+            renderRentalsTable(filtered);
+        }
+
+        function renderRentalsTable(data) {
+            const tbody = document.getElementById('rentalsTableBody');
+            const emptyState = document.getElementById('emptyTableState');
+
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                if (emptyState) emptyState.classList.remove('hidden');
+                return;
+            } else {
+                if (emptyState) emptyState.classList.add('hidden');
+            }
+
+            data.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/80 transition-colors border-b border-slate-100';
+
+                let lessorBadgeClass = "bg-slate-100 text-slate-700 border-slate-200";
+                if (r.lessorType === "Partner Business") lessorBadgeClass = "bg-purple-50 text-purple-700 border-purple-200";
+                else if (r.lessorType === "Individual Lessor") lessorBadgeClass = "bg-sky-50 text-sky-700 border-sky-200";
+
+                const paymentBadge = r.paymentStatus === 'Paid' 
+                    ? `<button onclick="updatePaymentStatus(${r.id}, 'Unpaid')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 cursor-pointer">Paid</button>`
+                    : `<button onclick="updatePaymentStatus(${r.id}, 'Paid')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 cursor-pointer">Unpaid</button>`;
+
+                tr.innerHTML = `
+                    <td class="py-3.5 px-5 font-bold text-slate-900">${r.customer || '-'}</td>
+                    <td class="py-3.5 px-5 font-medium text-slate-700">${r.items || '-'}</td>
+                    <td class="py-3.5 px-5">
+                        <span class="inline-block px-2.5 py-1 text-[10px] font-bold rounded-lg border ${lessorBadgeClass}">
+                            ${r.lessorName || 'In-House'}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-5 font-medium text-slate-600">${r.deposit || '-'}</td>
+                    <td class="py-3.5 px-5 font-bold text-slate-900">₱${(r.totalCustomerPrice || 0).toLocaleString()}</td>
+                    <td class="py-3.5 px-5 font-bold text-teal-600">₱${(r.totalOurShare || 0).toLocaleString()}</td>
+                    <td class="py-3.5 px-5">${paymentBadge}</td>
+                    <td class="py-3.5 px-5">
+                        <select onchange="updateStatus(${r.id}, this.value)" class="text-xs border border-slate-200 rounded-lg px-2 py-1 font-semibold focus:outline-none focus:border-teal-500 bg-white">
+                            <option value="Active" ${r.status === 'Active' ? 'selected' : ''}>Active</option>
+                            <option value="Overdue" ${r.status === 'Overdue' ? 'selected' : ''}>Overdue</option>
+                            <option value="Returned" ${r.status === 'Returned' ? 'selected' : ''}>Returned</option>
+                            <option value="Damaged" ${r.status === 'Damaged' ? 'selected' : ''}>Damaged</option>
+                        </select>
+                    </td>
+                    <td class="py-3.5 px-5 text-right space-x-1">
+                        <button onclick="openAddGearModal(${r.id})" class="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 font-bold rounded-lg text-[11px] transition cursor-pointer" title="Add More Gear">
+                            + Gear
+                        </button>
+                        <button onclick="deleteRental(${r.id})" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[11px] transition cursor-pointer" title="Delete Record">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function renderInventoryGrid() {
+            const container = document.getElementById('inventoryGrid');
+            if (!container) return;
+
+            const activeOut = { "Mask": 0, "Short Fins": 0, "Long Fins": 0, "Lifevest": 0, "GoPro": 0, "Floater": 0 };
+            rentalsData.forEach(r => {
+                if (r.status === 'Active' || r.status === 'Overdue') {
+                    if (r.itemQuantities) {
+                        Object.keys(activeOut).forEach(k => {
+                            activeOut[k] += r.itemQuantities[k] || 0;
+                        });
+                    }
+                }
+            });
+
+            container.innerHTML = '';
+            gearStockDirectory.forEach(item => {
+                const outCount = activeOut[item.code] || 0;
+                const available = Math.max(0, item.totalStock - outCount);
+
+                const card = document.createElement('div');
+                card.className = 'bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-3';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="p-2.5 bg-teal-50 text-teal-600 rounded-xl">
+                                <i data-lucide="${item.icon}" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 text-sm">${item.name}</h4>
+                                <span class="text-[11px] text-slate-400">Total Registered: ${item.totalStock}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+                        <div class="bg-slate-50 p-2.5 rounded-xl text-center">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Currently Rented</span>
+                            <span class="text-base font-extrabold text-amber-600">${outCount}</span>
+                        </div>
+                        <div class="bg-teal-50 p-2.5 rounded-xl text-center">
+                            <span class="text-[10px] text-teal-700 uppercase font-bold block">In Stock</span>
+                            <span class="text-base font-extrabold text-teal-700">${available}</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function renderLessorsGrid() {
+            const container = document.getElementById('lessorsGrid');
+            if (!container) return;
+
+            container.innerHTML = '';
+            lessorsDirectory.forEach(lessor => {
+                const activeCount = rentalsData.filter(r => (r.status === 'Active' || r.status === 'Overdue') && r.lessorName === lessor.name).length;
+
+                const isPartner = lessor.type === 'Partner Business';
+                const typeBadge = isPartner 
+                    ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Partner Business</span>`
+                    : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">Individual Lessor</span>`;
+
+                const card = document.createElement('div');
+                card.className = 'bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-3';
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <h4 class="font-bold text-slate-900 text-sm">${lessor.name}</h4>
+                                <p class="text-xs text-slate-400 mt-0.5">${lessor.location || 'Station'}</p>
+                            </div>
+                            ${typeBadge}
+                        </div>
+                        <div class="mt-3 space-y-1 text-xs text-slate-600">
+                            <p class="flex items-center space-x-1.5">
+                                <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i>
+                                <span>${lessor.phone || 'N/A'}</span>
+                            </p>
+                            <p class="flex items-center space-x-1.5">
+                                <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-400"></i>
+                                <span>${lessor.commission || 'Standard Split'}</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span class="text-slate-500 font-medium">${activeCount} Active Rental(s)</span>
+                        <div class="flex items-center space-x-1">
+                            <button onclick="openEditLessorModal(${lessor.id})" class="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition cursor-pointer" title="Edit Lessor">
+                                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button onclick="deleteLessor(${lessor.id})" class="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition cursor-pointer" title="Delete Lessor">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            if (window.lucide) lucide.createIcons();
+        }
+
         window.onload = function() {
+            loadSavedState();
             if (window.lucide) lucide.createIcons();
             populatePartnerDropdown();
             updateKPIs();

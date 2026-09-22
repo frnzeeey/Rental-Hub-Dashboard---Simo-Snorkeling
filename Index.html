@@ -31,7 +31,7 @@
                     <i data-lucide="waves" class="w-6 h-6"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-base text-white tracking-wide">Simo Snorkeling</h1>
+                    <h1 class="font-bold text-base text-white tracking-wide">AquaTrack</h1>
                     <p class="text-[11px] text-teal-400 font-medium">Snorkel Rental Hub</p>
                 </div>
             </div>
@@ -73,7 +73,11 @@
                 <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-semibold border border-slate-200">Live Status</span>
             </div>
 
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <button onclick="exportToPDF()" class="inline-flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer">
+                    <i data-lucide="file-down" class="w-4 h-4"></i>
+                    <span>Export PDF</span>
+                </button>
                 <button onclick="openRentalModal()" class="inline-flex items-center space-x-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md hover:shadow-teal-600/20 transition-all active:scale-95 cursor-pointer">
                     <i data-lucide="plus-circle" class="w-4 h-4"></i>
                     <span>New Rental</span>
@@ -384,7 +388,7 @@
                     <i data-lucide="sparkles" class="w-4 h-4 text-teal-600 flex-shrink-0"></i>
                     <div>
                         <span class="font-bold block text-teal-900" id="setTextBanner">Set Bundle Active!</span>
-                        <span class="text-[11px] text-teal-700">3-Gear Sets (Mask + Lifevest + Fins) automatically apply ₱100 Our Share rate.</span>
+                        <span class="text-[11px] text-teal-700">3-Gear Sets (Any combination of 3: Mask, Vest, Short Fins) automatically apply ₱100 Our Share rate.</span>
                     </div>
                 </div>
 
