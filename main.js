@@ -29,6 +29,13 @@
         let lessorsDirectory = [];
         let currentAddGearRentalId = null;
 
+        // UNIVERSAL ICON REFRESH HELPER
+        function refreshIcons() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        }
+
         // UI Toast Notification helper
         function showToast(message, type = 'info') {
             const container = document.getElementById('toastContainer');
@@ -52,13 +59,95 @@
                 <span class="flex-1">${message}</span>
             `;
             container.appendChild(toast);
-            if (window.lucide) lucide.createIcons();
+            refreshIcons();
 
             setTimeout(() => {
                 toast.style.opacity = '0';
                 toast.style.transition = 'opacity 0.3s ease';
                 setTimeout(() => toast.remove(), 300);
             }, 3500);
+        }
+
+        // Modal Open / Close Functions
+        function openRentalModal() {
+            resetRentalFormQuantities();
+            toggleLessorFields();
+            const modal = document.getElementById('rentalModal');
+            if (modal) modal.classList.remove('hidden');
+            refreshIcons();
+        }
+
+        function closeRentalModal() {
+            const modal = document.getElementById('rentalModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function openAddGearModal(rentalId) {
+            currentAddGearRentalId = rentalId;
+            const rental = rentalsData.find(r => r.id === rentalId);
+            if (!rental) return;
+
+            const subtitle = document.getElementById('addGearCustomerSubtitle');
+            if (subtitle) subtitle.textContent = `Append items for ${rental.customerName}`;
+
+            Object.keys(GEAR_PRICING_RULES).forEach(name => {
+                const chk = document.getElementById(`addChk-${name}`);
+                const qty = document.getElementById(`addQty-${name}`);
+                if (chk) chk.checked = false;
+                if (qty) qty.value = 0;
+            });
+
+            const currDisplay = document.getElementById('currentRentedItemsDisplay');
+            if (currDisplay) {
+                const itemsList = Object.entries(rental.items || {})
+                    .filter(([_, q]) => q > 0)
+                    .map(([n, q]) => `${n} x${q}`)
+                    .join(', ');
+                currDisplay.textContent = itemsList || 'None';
+            }
+
+            calculateAddGearModalPreview();
+            const modal = document.getElementById('addGearModal');
+            if (modal) modal.classList.remove('hidden');
+            refreshIcons();
+        }
+
+        function closeAddGearModal() {
+            currentAddGearRentalId = null;
+            const modal = document.getElementById('addGearModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function openLessorModal() {
+            const modal = document.getElementById('addLessorModal');
+            if (modal) modal.classList.remove('hidden');
+            refreshIcons();
+        }
+
+        function closeLessorModal() {
+            const modal = document.getElementById('addLessorModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function openEditLessorModal(id) {
+            const lessor = lessorsDirectory.find(l => l.id === id);
+            if (!lessor) return;
+
+            document.getElementById('editLessorId').value = lessor.id;
+            document.getElementById('editLessorName').value = lessor.name || '';
+            document.getElementById('editLessorType').value = lessor.type || 'Partner Business';
+            document.getElementById('editLessorLocation').value = lessor.location || '';
+            document.getElementById('editLessorPhone').value = lessor.phone || '';
+            document.getElementById('editLessorCommission').value = lessor.commission || '';
+
+            const modal = document.getElementById('editLessorModal');
+            if (modal) modal.classList.remove('hidden');
+            refreshIcons();
+        }
+
+        function closeEditLessorModal() {
+            const modal = document.getElementById('editLessorModal');
+            if (modal) modal.classList.add('hidden');
         }
 
         function toggleTheme() {
@@ -87,21 +176,51 @@
                     moonIcon.classList.remove('hidden');
                 }
             }
+            refreshIcons();
         }
 
-        function toggleMobileSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const backdrop = document.getElementById('mobileSidebarBackdrop');
-            if (!sidebar || !backdrop) return;
+        function switchTab(tabName) {
+            ['dashboard', 'inventory', 'lessors'].forEach(t => {
+                const view = document.getElementById(`view-${t}`);
+                const nav = document.getElementById(`nav-${t}`);
+                const dock = document.getElementById(`dock-${t}`);
 
-            const isClosed = sidebar.classList.contains('-translate-x-full');
-            if (isClosed) {
-                sidebar.classList.remove('-translate-x-full');
-                backdrop.classList.remove('hidden');
-            } else {
-                sidebar.classList.add('-translate-x-full');
-                backdrop.classList.add('hidden');
+                if (view) view.classList.add('hidden');
+                if (nav) {
+                    nav.classList.remove('bg-teal-500/10', 'text-teal-600', 'dark:text-teal-400', 'font-semibold', 'border', 'border-teal-500/20');
+                    nav.classList.add('hover:bg-slate-100', 'dark:hover:bg-slate-800', 'text-slate-600', 'dark:text-slate-400');
+                }
+                if (dock) {
+                    dock.classList.remove('bg-teal-500/10', 'text-teal-600', 'dark:text-teal-400', 'font-bold');
+                    dock.classList.add('text-slate-500', 'dark:text-slate-400');
+                }
+            });
+
+            const activeView = document.getElementById(`view-${tabName}`);
+            const activeNav = document.getElementById(`nav-${tabName}`);
+            const activeDock = document.getElementById(`dock-${tabName}`);
+            const pageTitle = document.getElementById('pageTitle');
+
+            if (activeView) activeView.classList.remove('hidden');
+            if (activeNav) {
+                activeNav.classList.add('bg-teal-500/10', 'text-teal-600', 'dark:text-teal-400', 'font-semibold', 'border', 'border-teal-500/20');
+                activeNav.classList.remove('hover:bg-slate-100', 'dark:hover:bg-slate-800', 'text-slate-600', 'dark:text-slate-400');
             }
+            if (activeDock) {
+                activeDock.classList.add('bg-teal-500/10', 'text-teal-600', 'dark:text-teal-400', 'font-bold');
+                activeDock.classList.remove('text-slate-500', 'dark:text-slate-400');
+            }
+
+            if (pageTitle) {
+                if (tabName === 'dashboard') pageTitle.textContent = "Rental Dashboard";
+                else if (tabName === 'inventory') pageTitle.textContent = "Gear Inventory Stock";
+                else if (tabName === 'lessors') pageTitle.textContent = "Lessors Directory";
+            }
+
+            if (tabName === 'inventory') renderInventoryGrid();
+            if (tabName === 'lessors') renderLessorsGrid();
+
+            refreshIcons();
         }
 
         function saveState() {
@@ -144,47 +263,8 @@
             }
         }
 
-        function switchTab(tabName) {
-            ['dashboard', 'inventory', 'lessors'].forEach(t => {
-                const view = document.getElementById(`view-${t}`);
-                const nav = document.getElementById(`nav-${t}`);
-                const dock = document.getElementById(`dock-${t}`);
-
-                if (view) view.classList.add('hidden');
-                if (nav) {
-                    nav.classList.remove('bg-teal-500/10', 'text-teal-600', 'dark:text-teal-400', 'font-semibold', 'border', 'border-teal-500/20');
-                    nav.classList.add('hover:bg-slate-100', 'dark:hover:bg-slate-800', 'text-slate-600', 'dark:text-slate-400');
-                }
-                if (dock) {
-                    dock.classList.remove('bg-teal-500/10', 'text-teal-600', 'dark:text-teal-400', 'font-bold');
-                    dock.classList.add('text-slate-500', 'dark:text-slate-400');
-                }
-            });
-
-            const activeView = document.getElementById(`view-${tabName}`);
-            const activeNav = document.getElementById(`nav-${tabName}`);
-            const activeDock = document.getElementById(`dock-${tabName}`);
-            const pageTitle = document.getElementById('pageTitle');
-
-            if (activeView) activeView.classList.remove('hidden');
-            if (activeNav) {
-                activeNav.classList.add('bg-teal-500/10', 'text-teal-600', 'dark:text-teal-400', 'font-semibold', 'border', 'border-teal-500/20');
-                activeNav.classList.remove('hover:bg-slate-100', 'dark:hover:bg-slate-800', 'text-slate-600', 'dark:text-slate-400');
-            }
-            if (activeDock) {
-                activeDock.classList.add('bg-teal-500/10', 'text-teal-600', 'dark:text-teal-400', 'font-bold');
-                activeDock.classList.remove('text-slate-500', 'dark:text-slate-400');
-            }
-
-            if (pageTitle) {
-                if (tabName === 'dashboard') pageTitle.textContent = "Rental Dashboard";
-                else if (tabName === 'inventory') pageTitle.textContent = "Gear Inventory Stock";
-                else if (tabName === 'lessors') pageTitle.textContent = "Lessors Directory";
-            }
-        }
-
         // 2. TRANSACTION CALCULATION ENGINE
-        function computeTransaction(itemQuantities, lessorType) {
+        function computeTransaction(itemQuantities, lessorType, inHouseMode = 'Standard', paxCount = 1) {
             const M = itemQuantities['Mask'] || 0;
             const SF = itemQuantities['Short Fins'] || 0;
             const LF = itemQuantities['Long Fins'] || 0;
@@ -192,26 +272,77 @@
             const GP = itemQuantities['GoPro'] || 0;
             const FL = itemQuantities['Floater'] || 0;
 
-            // Total Customer Price: Exact sum of all item prices
-            const totalCustomerPrice = (M * 100) + (SF * 150) + (LF * 300) + (V * 100) + (GP * 700) + (FL * 100);
+            let totalCustomerPrice = 0;
+            let totalOurShare = 0;
+            let totalLessorShare = 0;
 
-            // Universal 3-Gear Bundle Rule: Mask, Lifevest, Short Fins
+            if (lessorType === "In-House" && inHouseMode === "Package") {
+                const pax = Math.max(1, parseInt(paxCount) || 1);
+                const packageBasePrice = pax * 500;
+                const addOnsPrice = (SF * 150) + (LF * 300) + (GP * 700);
+
+                totalCustomerPrice = packageBasePrice + addOnsPrice;
+                totalOurShare = totalCustomerPrice;
+                totalLessorShare = 0;
+
+                return {
+                    totalCustomerPrice,
+                    totalOurShare,
+                    totalLessorShare,
+                    totalSets: 0,
+                    isPackage: true,
+                    packageType: 'In-House Package',
+                    pax,
+                    remMask: pax,
+                    remVest: pax,
+                    remShortFins: SF,
+                    remLongFins: LF,
+                    goProQty: GP,
+                    floaterQty: 0
+                };
+            }
+
+            if (lessorType === "Travel Agency") {
+                const pax = Math.max(1, parseInt(paxCount) || 1);
+                const ratePerHead = pax < 5 ? 350 : 300;
+                const agencyBasePrice = pax * ratePerHead;
+                const addOnsPrice = (SF * 150) + (LF * 300) + (GP * 700);
+
+                totalCustomerPrice = agencyBasePrice + addOnsPrice;
+                totalOurShare = totalCustomerPrice;
+                totalLessorShare = 0;
+
+                return {
+                    totalCustomerPrice,
+                    totalOurShare,
+                    totalLessorShare,
+                    totalSets: 0,
+                    isPackage: true,
+                    packageType: `Travel Agency (₱${ratePerHead}/hd)`,
+                    pax,
+                    remMask: pax,
+                    remVest: pax,
+                    remShortFins: SF,
+                    remLongFins: LF,
+                    goProQty: GP,
+                    floaterQty: 0
+                };
+            }
+
+            // Standard Itemized Pricing
+            totalCustomerPrice = (M * 100) + (SF * 150) + (LF * 300) + (V * 100) + (GP * 700) + (FL * 100);
+
+            // Set Bundle Rule: Combinations of Mask, Lifevest, and Short Fins
             const totalBundleGearCount = M + V + SF;
             const totalSets = Math.floor(totalBundleGearCount / 3);
             const remBundleItems = totalBundleGearCount % 3;
-
-            let totalOurShare = 0;
-            let totalLessorShare = 0;
 
             if (lessorType === "In-House") {
                 totalOurShare = totalCustomerPrice;
                 totalLessorShare = 0;
             } else {
-                // Partner or Freelance Lessor: ₱100 Our Share per 3-gear set
                 totalOurShare += totalSets * 100;
-                // Remaining unbundled gear from Mask, Vest, Short Fins yield ₱50 Our Share each
                 totalOurShare += remBundleItems * 50;
-                // Long Fins, GoPro, Floater yield standard per-item commission rates
                 totalOurShare += (LF * 150) + (GP * 400) + (FL * 50);
 
                 totalLessorShare = Math.max(0, totalCustomerPrice - totalOurShare);
@@ -222,6 +353,8 @@
                 totalOurShare,
                 totalLessorShare,
                 totalSets,
+                isPackage: false,
+                pax: 0,
                 remMask: M,
                 remVest: V,
                 remShortFins: SF,
@@ -231,7 +364,6 @@
             };
         }
 
-        // Modal Checkbox and Quantity Synchronization
         function handleCheckboxChange(name) {
             const chk = document.getElementById(`chk-${name}`);
             const qtyInput = document.getElementById(`qty-${name}`);
@@ -270,7 +402,24 @@
             const lessorTypeRadio = document.querySelector('input[name="lessorTypeRadio"]:checked');
             const lessorType = lessorTypeRadio ? lessorTypeRadio.value : 'In-House';
 
-            const res = computeTransaction(itemQuantities, lessorType);
+            const inHouseModeRadio = document.querySelector('input[name="inHouseModeRadio"]:checked');
+            const inHouseMode = (lessorType === 'In-House' && inHouseModeRadio) ? inHouseModeRadio.value : 'Standard';
+
+            let paxCount = 1;
+            if (lessorType === 'In-House' && inHouseMode === 'Package') {
+                const paxInput = document.getElementById('paxCount');
+                paxCount = paxInput ? parseInt(paxInput.value) || 1 : 1;
+            } else if (lessorType === 'Travel Agency') {
+                const agencyPaxInput = document.getElementById('agencyPaxCount');
+                paxCount = agencyPaxInput ? parseInt(agencyPaxInput.value) || 1 : 1;
+
+                const badge = document.getElementById('agencyRateBadge');
+                if (badge) {
+                    badge.textContent = paxCount < 5 ? `₱350/head (${paxCount} pax)` : `₱300/head (${paxCount} pax)`;
+                }
+            }
+
+            const res = computeTransaction(itemQuantities, lessorType, inHouseMode, paxCount);
 
             document.getElementById('previewTotalPrice').textContent = `₱${res.totalCustomerPrice.toLocaleString()}`;
             document.getElementById('previewOurShare').textContent = `₱${res.totalOurShare.toLocaleString()}`;
@@ -279,7 +428,15 @@
             const banner = document.getElementById('setDiscountBanner');
             const bannerText = document.getElementById('setTextBanner');
             if (banner && bannerText) {
-                if (res.totalSets > 0 && lessorType !== "In-House") {
+                if (res.isPackage) {
+                    banner.classList.remove('hidden');
+                    if (lessorType === 'Travel Agency') {
+                        const rate = paxCount < 5 ? 350 : 300;
+                        bannerText.textContent = `Travel Agency Tier Active (${paxCount} Pax @ ₱${rate}/head = ₱${(paxCount * rate).toLocaleString()})`;
+                    } else {
+                        bannerText.textContent = `₱500 Package Active (${res.pax} Pax = ₱${(res.pax * 500).toLocaleString()})`;
+                    }
+                } else if (res.totalSets > 0 && lessorType !== "In-House") {
                     banner.classList.remove('hidden');
                     bannerText.textContent = `${res.totalSets} Set Bundle(s) Active! (₱100 Our Share rate per 3 items)`;
                 } else {
@@ -288,13 +445,40 @@
             }
         }
 
-        function resetRentalFormQuantities() {
-            Object.keys(GEAR_PRICING_RULES).forEach(name => {
-                const chk = document.getElementById(`chk-${name}`);
-                const qty = document.getElementById(`qty-${name}`);
-                if (chk) chk.checked = false;
-                if (qty) qty.value = 0;
-            });
+        function setGearVisibility(hideBasicGears) {
+            const gearTitle = document.getElementById('gearSectionTitle');
+            const basicGears = ['Mask', 'Lifevest', 'Floater'];
+
+            if (hideBasicGears) {
+                if (gearTitle) gearTitle.textContent = "Optional Gear Add-Ons";
+                basicGears.forEach(name => {
+                    const row = document.getElementById(`row-${name}`);
+                    const chk = document.getElementById(`chk-${name}`);
+                    const qty = document.getElementById(`qty-${name}`);
+                    if (row) row.classList.add('hidden');
+                    if (chk) chk.checked = false;
+                    if (qty) qty.value = 0;
+                });
+            } else {
+                if (gearTitle) gearTitle.textContent = "Select Gear Items & Quantities *";
+                basicGears.forEach(name => {
+                    const row = document.getElementById(`row-${name}`);
+                    if (row) row.classList.remove('hidden');
+                });
+            }
+        }
+
+        function toggleInHouseMode() {
+            const inHouseModeRadio = document.querySelector('input[name="inHouseModeRadio"]:checked');
+            const mode = inHouseModeRadio ? inHouseModeRadio.value : 'Standard';
+
+            const pkgBox = document.getElementById('packageDetailsBox');
+            if (pkgBox) {
+                if (mode === 'Package') pkgBox.classList.remove('hidden');
+                else pkgBox.classList.add('hidden');
+            }
+
+            setGearVisibility(mode === 'Package');
             calculateModalPreview();
         }
 
@@ -304,15 +488,43 @@
 
             const partnerContainer = document.getElementById('partnerLessorContainer');
             const customContainer = document.getElementById('customLessorContainer');
+            const inHousePkgContainer = document.getElementById('inHousePackageContainer');
+            const travelAgencyContainer = document.getElementById('travelAgencyContainer');
+
+            const customerContainer = document.getElementById('customerNameContainer');
+            const depositAndDueContainer = document.getElementById('depositAndDueContainer');
 
             if (partnerContainer) partnerContainer.classList.add('hidden');
             if (customContainer) customContainer.classList.add('hidden');
+            if (inHousePkgContainer) inHousePkgContainer.classList.add('hidden');
+            if (travelAgencyContainer) travelAgencyContainer.classList.add('hidden');
 
-            if (type === 'Partner Business') {
-                if (partnerContainer) partnerContainer.classList.remove('hidden');
-                populatePartnerDropdown();
-            } else if (type === 'Individual Lessor') {
-                if (customContainer) customContainer.classList.remove('hidden');
+            const isPackageOrAgency = (type === 'In-House' || type === 'Travel Agency');
+
+            if (customerContainer) {
+                if (isPackageOrAgency) customerContainer.classList.add('hidden');
+                else customerContainer.classList.remove('hidden');
+            }
+
+            if (depositAndDueContainer) {
+                if (isPackageOrAgency) depositAndDueContainer.classList.add('hidden');
+                else depositAndDueContainer.classList.remove('hidden');
+            }
+
+            if (type === 'In-House') {
+                if (inHousePkgContainer) inHousePkgContainer.classList.remove('hidden');
+                toggleInHouseMode();
+            } else if (type === 'Travel Agency') {
+                if (travelAgencyContainer) travelAgencyContainer.classList.remove('hidden');
+                setGearVisibility(true);
+            } else {
+                setGearVisibility(false);
+                if (type === 'Partner Business') {
+                    if (partnerContainer) partnerContainer.classList.remove('hidden');
+                    populatePartnerDropdown();
+                } else if (type === 'Individual Lessor') {
+                    if (customContainer) customContainer.classList.remove('hidden');
+                }
             }
 
             calculateModalPreview();
@@ -340,323 +552,328 @@
             }
         }
 
-        // Modal Open / Close Helpers
-        function openRentalModal() {
-            resetRentalFormQuantities();
-            toggleLessorFields();
-            document.getElementById('rentalModal').classList.remove('hidden');
-        }
-
-        function closeRentalModal() {
-            document.getElementById('rentalModal').classList.add('hidden');
-        }
-
-        function openLessorModal() {
-            document.getElementById('addLessorModal').classList.remove('hidden');
-        }
-
-        function closeLessorModal() {
-            document.getElementById('addLessorModal').classList.add('hidden');
-        }
-
-        function openEditLessorModal(id) {
-            const lessor = lessorsDirectory.find(l => l.id === id);
-            if (!lessor) return;
-
-            document.getElementById('editLessorId').value = lessor.id;
-            document.getElementById('editLessorName').value = lessor.name;
-            document.getElementById('editLessorType').value = lessor.type;
-            document.getElementById('editLessorLocation').value = lessor.location || '';
-            document.getElementById('editLessorPhone').value = lessor.phone || '';
-            document.getElementById('editLessorCommission').value = lessor.commission || '';
-
-            document.getElementById('editLessorModal').classList.remove('hidden');
-        }
-
-        function closeEditLessorModal() {
-            document.getElementById('editLessorModal').classList.add('hidden');
-        }
-
-        function handleRentalSubmit(event) {
-            event.preventDefault();
-
-            const customer = document.getElementById('customerName').value.trim();
-            const notes = document.getElementById('rentalNotes')?.value.trim() || '';
-            const deposit = document.getElementById('depositHeld').value;
-            const dueTime = document.getElementById('dueTime').value;
-            const paymentStatusRadio = document.querySelector('input[name="paymentStatusRadio"]:checked');
-            const paymentStatus = paymentStatusRadio ? paymentStatusRadio.value : 'Paid';
-            const lessorTypeRadio = document.querySelector('input[name="lessorTypeRadio"]:checked');
-            const lessorType = lessorTypeRadio ? lessorTypeRadio.value : 'In-House';
-
-            let lessorName = "In-House";
-            if (lessorType === "Partner Business") {
-                lessorName = document.getElementById('partnerLessorSelect').value;
-            } else if (lessorType === "Individual Lessor") {
-                const customName = document.getElementById('customLessorName').value.trim();
-                if (!customName) {
-                    showToast("Please enter the Individual Lessor / Guide's Name.", "warning");
-                    return;
-                }
-                lessorName = customName;
-
-                const phone = document.getElementById('customLessorPhone').value.trim();
-                const lessorNotes = document.getElementById('customLessorNotes').value.trim();
-
-                if (!lessorsDirectory.some(l => l.name.toLowerCase() === customName.toLowerCase())) {
-                    lessorsDirectory.push({
-                        id: Date.now(),
-                        name: customName,
-                        type: "Individual Lessor",
-                        location: "Freelance / Local",
-                        phone: phone || "N/A",
-                        commission: lessorNotes || "Standard Split"
-                    });
-                    renderLessorsGrid();
-                }
-            }
-
-            const itemQuantities = {};
-            let totalItemCount = 0;
+        function resetRentalFormQuantities() {
             Object.keys(GEAR_PRICING_RULES).forEach(name => {
-                const qtyInput = document.getElementById(`qty-${name}`);
-                const qty = qtyInput ? parseInt(qtyInput.value) || 0 : 0;
-                itemQuantities[name] = qty;
-                totalItemCount += qty;
-            });
-
-            if (totalItemCount === 0) {
-                showToast("Please select at least one gear item with a quantity greater than zero.", "warning");
-                return;
-            }
-
-            const pricingBreakdown = computeTransaction(itemQuantities, lessorType);
-
-            const formattedParts = [];
-            if (pricingBreakdown.totalSets > 0) formattedParts.push(`Gear Set x${pricingBreakdown.totalSets}`);
-            if (pricingBreakdown.remMask > 0 && pricingBreakdown.totalSets === 0) formattedParts.push(`Mask x${pricingBreakdown.remMask}`);
-            if (pricingBreakdown.remVest > 0 && pricingBreakdown.totalSets === 0) formattedParts.push(`Lifevest x${pricingBreakdown.remVest}`);
-            if (pricingBreakdown.remShortFins > 0 && pricingBreakdown.totalSets === 0) formattedParts.push(`Short Fins x${pricingBreakdown.remShortFins}`);
-            if (pricingBreakdown.remLongFins > 0) formattedParts.push(`Long Fins x${pricingBreakdown.remLongFins}`);
-            if (pricingBreakdown.goProQty > 0) formattedParts.push(`GoPro x${pricingBreakdown.goProQty}`);
-            if (pricingBreakdown.floaterQty > 0) formattedParts.push(`Floater x${pricingBreakdown.floaterQty}`);
-
-            const newRecord = {
-                id: Date.now(),
-                customer: customer,
-                notes: notes,
-                items: formattedParts.join(', '),
-                itemQuantities: { ...itemQuantities },
-                lessorType: lessorType,
-                lessorName: lessorName,
-                deposit: deposit,
-                dueTime: dueTime,
-                paymentStatus: paymentStatus,
-                status: 'Active',
-                totalCustomerPrice: pricingBreakdown.totalCustomerPrice,
-                totalOurShare: pricingBreakdown.totalOurShare,
-                totalLessorShare: pricingBreakdown.totalLessorShare
-            };
-
-            rentalsData.unshift(newRecord);
-            saveState();
-            updateKPIs();
-            filterTable();
-            renderInventoryGrid();
-            renderLessorsGrid();
-            closeRentalModal();
-
-            document.getElementById('newRentalForm').reset();
-            resetRentalFormQuantities();
-            toggleLessorFields();
-            showToast("Rental order issued successfully!", "success");
-        }
-
-        function openAddGearModal(rentalId) {
-            const rental = rentalsData.find(r => r.id === rentalId);
-            if (!rental) return;
-
-            currentAddGearRentalId = rentalId;
-
-            document.getElementById('addGearCustomerSubtitle').textContent = `Append items for: ${rental.customer}`;
-            document.getElementById('currentRentedItemsDisplay').textContent = rental.items || 'None';
-
-            Object.keys(GEAR_PRICING_RULES).forEach(name => {
-                const chk = document.getElementById(`addChk-${name}`);
-                const qty = document.getElementById(`addQty-${name}`);
+                const chk = document.getElementById(`chk-${name}`);
+                const qty = document.getElementById(`qty-${name}`);
                 if (chk) chk.checked = false;
                 if (qty) qty.value = 0;
             });
 
-            calculateAddGearPreview();
-            document.getElementById('addGearModal').classList.remove('hidden');
-        }
+            const paxInput = document.getElementById('paxCount');
+            if (paxInput) paxInput.value = 1;
 
-        function closeAddGearModal() {
-            document.getElementById('addGearModal').classList.add('hidden');
-            currentAddGearRentalId = null;
+            const agencyPaxInput = document.getElementById('agencyPaxCount');
+            if (agencyPaxInput) agencyPaxInput.value = 1;
+
+            const agencyName = document.getElementById('agencyNameInput');
+            if (agencyName) agencyName.value = '';
+
+            const customName = document.getElementById('customLessorName');
+            if (customName) customName.value = '';
+            const customPhone = document.getElementById('customLessorPhone');
+            if (customPhone) customPhone.value = '';
+            const customNotes = document.getElementById('customLessorNotes');
+            if (customNotes) customNotes.value = '';
+
+            const customerInput = document.getElementById('customerName');
+            if (customerInput) customerInput.value = '';
+
+            const notesInput = document.getElementById('rentalNotes');
+            if (notesInput) notesInput.value = '';
+
+            const defaultPaid = document.querySelector('input[name="paymentStatusRadio"][value="Paid"]');
+            if (defaultPaid) defaultPaid.checked = true;
+
+            const defaultInHouse = document.querySelector('input[name="lessorTypeRadio"][value="In-House"]');
+            if (defaultInHouse) defaultInHouse.checked = true;
+
+            const defaultStandardMode = document.querySelector('input[name="inHouseModeRadio"][value="Standard"]');
+            if (defaultStandardMode) defaultStandardMode.checked = true;
         }
 
         function handleAddGearCheckboxChange(name) {
             const chk = document.getElementById(`addChk-${name}`);
-            const qtyInput = document.getElementById(`addQty-${name}`);
-            if (!chk || !qtyInput) return;
+            const qty = document.getElementById(`addQty-${name}`);
+            if (!chk || !qty) return;
 
             if (chk.checked) {
-                if (parseInt(qtyInput.value) <= 0) qtyInput.value = 1;
+                if (parseInt(qty.value) <= 0) qty.value = 1;
             } else {
-                qtyInput.value = 0;
+                qty.value = 0;
             }
-            calculateAddGearPreview();
+            calculateAddGearModalPreview();
         }
 
         function handleAddGearQuantityInput(name) {
             const chk = document.getElementById(`addChk-${name}`);
-            const qtyInput = document.getElementById(`addQty-${name}`);
-            if (!chk || !qtyInput) return;
+            const qty = document.getElementById(`addQty-${name}`);
+            if (!chk || !qty) return;
 
-            const val = parseInt(qtyInput.value) || 0;
+            const val = parseInt(qty.value) || 0;
             if (val > 0) {
                 chk.checked = true;
             } else {
                 chk.checked = false;
-                qtyInput.value = 0;
+                qty.value = 0;
             }
-            calculateAddGearPreview();
+            calculateAddGearModalPreview();
         }
 
-        function calculateAddGearPreview() {
+        function calculateAddGearModalPreview() {
+            if (!currentAddGearRentalId) return;
             const rental = rentalsData.find(r => r.id === currentAddGearRentalId);
             if (!rental) return;
 
-            const additionalQuantities = {};
+            const addQuantities = {};
             let addedTotal = 0;
-
             Object.keys(GEAR_PRICING_RULES).forEach(name => {
-                const qty = parseInt(document.getElementById(`addQty-${name}`)?.value) || 0;
-                additionalQuantities[name] = qty;
-                addedTotal += qty * GEAR_PRICING_RULES[name].price;
+                const qtyInput = document.getElementById(`addQty-${name}`);
+                const q = qtyInput ? (parseInt(qtyInput.value) || 0) : 0;
+                addQuantities[name] = q;
+                addedTotal += q * GEAR_PRICING_RULES[name].price;
             });
 
-            const currentTotal = rental.totalCustomerPrice || 0;
+            const currentTotal = rental.totalPrice || 0;
             const newTotal = currentTotal + addedTotal;
 
-            document.getElementById('addGearCurrentTotal').textContent = `₱${currentTotal.toLocaleString()}`;
-            document.getElementById('addGearAddedTotal').textContent = `+₱${addedTotal.toLocaleString()}`;
-            document.getElementById('addGearNewTotal').textContent = `₱${newTotal.toLocaleString()}`;
+            const currTotalEl = document.getElementById('addGearCurrentTotal');
+            const addTotalEl = document.getElementById('addGearAddedTotal');
+            const newTotalEl = document.getElementById('addGearNewTotal');
+
+            if (currTotalEl) currTotalEl.textContent = `₱${currentTotal.toLocaleString()}`;
+            if (addTotalEl) addTotalEl.textContent = `+₱${addedTotal.toLocaleString()}`;
+            if (newTotalEl) newTotalEl.textContent = `₱${newTotal.toLocaleString()}`;
         }
 
-        function handleAddGearSubmit(event) {
-            event.preventDefault();
+        function handleAddGearSubmit(e) {
+            e.preventDefault();
+            if (!currentAddGearRentalId) return;
+
             const rental = rentalsData.find(r => r.id === currentAddGearRentalId);
             if (!rental) return;
 
-            const newQuantities = { ...rental.itemQuantities };
-            let addedItemCount = 0;
+            const combinedItems = { ...rental.items };
+            let addedCount = 0;
 
             Object.keys(GEAR_PRICING_RULES).forEach(name => {
-                const qty = parseInt(document.getElementById(`addQty-${name}`)?.value) || 0;
-                if (qty > 0) {
-                    newQuantities[name] = (newQuantities[name] || 0) + qty;
-                    addedItemCount += qty;
+                const qtyInput = document.getElementById(`addQty-${name}`);
+                const addQty = qtyInput ? (parseInt(qtyInput.value) || 0) : 0;
+                if (addQty > 0) {
+                    combinedItems[name] = (combinedItems[name] || 0) + addQty;
+                    addedCount += addQty;
                 }
             });
 
-            if (addedItemCount === 0) {
-                showToast("Please select at least one additional gear item to add.", "warning");
+            if (addedCount <= 0) {
+                showToast("Please select at least 1 gear item to append.", "warning");
                 return;
             }
 
-            const pricingBreakdown = computeTransaction(newQuantities, rental.lessorType);
+            const inHouseMode = rental.inHouseMode || 'Standard';
+            const paxCount = rental.pax || 1;
+            const computed = computeTransaction(combinedItems, rental.lessorType, inHouseMode, paxCount);
 
-            const formattedParts = [];
-            if (pricingBreakdown.totalSets > 0) formattedParts.push(`Gear Set x${pricingBreakdown.totalSets}`);
-            if (pricingBreakdown.remMask > 0 && pricingBreakdown.totalSets === 0) formattedParts.push(`Mask x${pricingBreakdown.remMask}`);
-            if (pricingBreakdown.remVest > 0 && pricingBreakdown.totalSets === 0) formattedParts.push(`Lifevest x${pricingBreakdown.remVest}`);
-            if (pricingBreakdown.remShortFins > 0 && pricingBreakdown.totalSets === 0) formattedParts.push(`Short Fins x${pricingBreakdown.remShortFins}`);
-            if (pricingBreakdown.remLongFins > 0) formattedParts.push(`Long Fins x${pricingBreakdown.remLongFins}`);
-            if (pricingBreakdown.goProQty > 0) formattedParts.push(`GoPro x${pricingBreakdown.goProQty}`);
-            if (pricingBreakdown.floaterQty > 0) formattedParts.push(`Floater x${pricingBreakdown.floaterQty}`);
-
-            rental.itemQuantities = newQuantities;
-            rental.items = formattedParts.join(', ');
-            rental.totalCustomerPrice = pricingBreakdown.totalCustomerPrice;
-            rental.totalOurShare = pricingBreakdown.totalOurShare;
-            rental.totalLessorShare = pricingBreakdown.totalLessorShare;
+            rental.items = combinedItems;
+            rental.totalPrice = computed.totalCustomerPrice;
+            rental.ourShare = computed.totalOurShare;
+            rental.lessorShare = computed.totalLessorShare;
 
             saveState();
-            updateKPIs();
-            filterTable();
-            renderInventoryGrid();
             closeAddGearModal();
-            showToast("Additional gear appended successfully!", "success");
+            renderTable();
+            updateKPIs();
+            showToast(`Successfully added ${addedCount} item(s) to ${rental.customerName}'s order!`, "success");
         }
 
-        function handleNewLessorSubmit(event) {
-            event.preventDefault();
+        function handleRentalSubmit(e) {
+            e.preventDefault();
+
+            let customerName = document.getElementById('customerName').value.trim();
+            const notes = document.getElementById('rentalNotes').value.trim();
+            const paymentStatusRadio = document.querySelector('input[name="paymentStatusRadio"]:checked');
+            const paymentStatus = paymentStatusRadio ? paymentStatusRadio.value : 'Paid';
+
+            const lessorTypeRadio = document.querySelector('input[name="lessorTypeRadio"]:checked');
+            const lessorType = lessorTypeRadio ? lessorTypeRadio.value : 'In-House';
+
+            const inHouseModeRadio = document.querySelector('input[name="inHouseModeRadio"]:checked');
+            const inHouseMode = (lessorType === 'In-House' && inHouseModeRadio) ? inHouseModeRadio.value : 'Standard';
+
+            let paxCount = 1;
+            let lessorSource = 'In-House Hub';
+
+            if (lessorType === 'In-House') {
+                if (inHouseMode === 'Package') {
+                    paxCount = parseInt(document.getElementById('paxCount').value) || 1;
+                    lessorSource = `In-House Hub (${paxCount} Pax Package)`;
+                }
+                if (!customerName) {
+                    customerName = `In-House Guest (${paxCount} Pax)`;
+                }
+            } else if (lessorType === 'Partner Business') {
+                lessorSource = document.getElementById('partnerLessorSelect').value || 'Partner Business';
+                if (!customerName) {
+                    showToast("Please enter the customer / guest full name.", "warning");
+                    return;
+                }
+            } else if (lessorType === 'Individual Lessor') {
+                const cName = document.getElementById('customLessorName').value.trim();
+                const cPhone = document.getElementById('customLessorPhone').value.trim();
+                lessorSource = cName ? `Individual: ${cName}` : 'Individual Guide';
+
+                if (!customerName) {
+                    showToast("Please enter the customer / guest full name.", "warning");
+                    return;
+                }
+
+                if (cName) {
+                    const exists = lessorsDirectory.some(l => l.name.toLowerCase() === cName.toLowerCase());
+                    if (!exists) {
+                        lessorsDirectory.push({
+                            id: Date.now(),
+                            name: cName,
+                            type: 'Individual Lessor',
+                            location: 'Freelance',
+                            phone: cPhone || 'N/A',
+                            commission: 'Standard Split'
+                        });
+                    }
+                }
+            } else if (lessorType === 'Travel Agency') {
+                const agencyName = document.getElementById('agencyNameInput').value.trim();
+                paxCount = parseInt(document.getElementById('agencyPaxCount').value) || 1;
+                lessorSource = agencyName ? `Agency: ${agencyName} (${paxCount} Pax)` : `Travel Agency (${paxCount} Pax)`;
+                if (!customerName) {
+                    customerName = agencyName ? `${agencyName} Guest` : `Travel Agency Guest (${paxCount} Pax)`;
+                }
+            }
+
+            const itemQuantities = {};
+            let totalItemsCount = 0;
+
+            Object.keys(GEAR_PRICING_RULES).forEach(name => {
+                const qtyInput = document.getElementById(`qty-${name}`);
+                const q = qtyInput ? (parseInt(qtyInput.value) || 0) : 0;
+                itemQuantities[name] = q;
+                totalItemsCount += q;
+            });
+
+            if (lessorType === 'In-House' && inHouseMode === 'Package') {
+                itemQuantities['Mask'] = paxCount;
+                itemQuantities['Lifevest'] = paxCount;
+                totalItemsCount += (paxCount * 2);
+            } else if (lessorType === 'Travel Agency') {
+                itemQuantities['Mask'] = paxCount;
+                itemQuantities['Lifevest'] = paxCount;
+                totalItemsCount += (paxCount * 2);
+            }
+
+            if (totalItemsCount <= 0) {
+                showToast("Please select at least 1 gear item quantity to issue.", "warning");
+                return;
+            }
+
+            const depositHeld = (lessorType === 'In-House' || lessorType === 'Travel Agency') 
+                ? 'None / Included' 
+                : document.getElementById('depositHeld').value;
+            const dueTime = document.getElementById('dueTime').value || '17:00';
+
+            const computed = computeTransaction(itemQuantities, lessorType, inHouseMode, paxCount);
+
+            const newRental = {
+                id: Date.now(),
+                customerName,
+                notes,
+                items: itemQuantities,
+                lessorSource,
+                lessorType,
+                inHouseMode,
+                pax: paxCount,
+                depositHeld,
+                dueTime,
+                totalPrice: computed.totalCustomerPrice,
+                ourShare: computed.totalOurShare,
+                lessorShare: computed.totalLessorShare,
+                paymentStatus,
+                status: 'Active',
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+
+            rentalsData.unshift(newRental);
+            saveState();
+            closeRentalModal();
+            renderTable();
+            updateKPIs();
+            showToast(`Rental order issued successfully for ${customerName}!`, "success");
+        }
+
+        function handleNewLessorSubmit(e) {
+            e.preventDefault();
             const name = document.getElementById('newLessorName').value.trim();
             const type = document.getElementById('newLessorType').value;
-            const location = document.getElementById('newLessorLocation').value.trim();
-            const phone = document.getElementById('newLessorPhone').value.trim();
-            const commission = document.getElementById('newLessorCommission').value.trim();
+            const location = document.getElementById('newLessorLocation').value.trim() || 'Main Station';
+            const phone = document.getElementById('newLessorPhone').value.trim() || 'N/A';
+            const commission = document.getElementById('newLessorCommission').value.trim() || 'Standard Split';
 
             if (!name) return;
 
-            lessorsDirectory.push({
+            const newLessor = {
                 id: Date.now(),
                 name,
                 type,
-                location: location || "Station",
-                phone: phone || "N/A",
-                commission: commission || "Standard Split"
-            });
+                location,
+                phone,
+                commission
+            };
 
+            lessorsDirectory.push(newLessor);
             saveState();
+            closeLessorModal();
             renderLessorsGrid();
             populatePartnerDropdown();
-            closeLessorModal();
-            showToast("New lessor registered successfully!", "success");
+            showToast(`Registered new lessor: ${name}`, "success");
         }
 
-        function handleEditLessorSubmit(event) {
-            event.preventDefault();
+        function handleEditLessorSubmit(e) {
+            e.preventDefault();
             const id = parseInt(document.getElementById('editLessorId').value);
-            const name = document.getElementById('editLessorName').value.trim();
-            const type = document.getElementById('editLessorType').value;
-            const location = document.getElementById('editLessorLocation').value.trim();
-            const phone = document.getElementById('editLessorPhone').value.trim();
-            const commission = document.getElementById('editLessorCommission').value.trim();
-
             const lessor = lessorsDirectory.find(l => l.id === id);
             if (!lessor) return;
 
             const oldName = lessor.name;
-            lessor.name = name;
-            lessor.type = type;
-            lessor.location = location || "Station";
-            lessor.phone = phone || "N/A";
-            lessor.commission = commission || "Standard Split";
+            lessor.name = document.getElementById('editLessorName').value.trim();
+            lessor.type = document.getElementById('editLessorType').value;
+            lessor.location = document.getElementById('editLessorLocation').value.trim();
+            lessor.phone = document.getElementById('editLessorPhone').value.trim();
+            lessor.commission = document.getElementById('editLessorCommission').value.trim();
 
-            // Update rental records matching old name
-            rentalsData.forEach(r => {
-                if (r.lessorName === oldName) r.lessorName = name;
-            });
+            if (oldName !== lessor.name) {
+                rentalsData.forEach(r => {
+                    if (r.lessorSource === oldName) r.lessorSource = lessor.name;
+                    if (r.lessorSource === `Individual: ${oldName}`) r.lessorSource = `Individual: ${lessor.name}`;
+                });
+            }
 
             saveState();
-            renderLessorsGrid();
-            filterTable();
-            populatePartnerDropdown();
             closeEditLessorModal();
-            showToast("Lessor details updated!", "success");
+            renderLessorsGrid();
+            renderTable();
+            populatePartnerDropdown();
+            showToast(`Updated lessor profile for ${lessor.name}`, "success");
         }
 
         function deleteLessor(id) {
             const lessor = lessorsDirectory.find(l => l.id === id);
             if (!lessor) return;
 
-            const activeCount = rentalsData.filter(r => r.lessorName === lessor.name && (r.status === 'Active' || r.status === 'Overdue')).length;
-            if (activeCount > 0) {
-                showToast(`Cannot delete "${lessor.name}" because they have ${activeCount} active rental(s).`, "warning");
+            const hasActiveRentals = rentalsData.some(r => 
+                r.lessorSource === lessor.name || 
+                r.lessorSource === `Individual: ${lessor.name}`
+            );
+
+            if (hasActiveRentals) {
+                showToast(`Cannot delete ${lessor.name} because they have active rentals logged.`, "warning");
                 return;
             }
 
@@ -664,320 +881,300 @@
             saveState();
             renderLessorsGrid();
             populatePartnerDropdown();
-            showToast("Lessor removed from directory.", "info");
+            showToast(`Removed lessor ${lessor.name}`, "info");
         }
 
-        function updateKPIs() {
-            let activeCount = 0;
-            let overdueCount = 0;
-            let totalRevenue = 0;
-            let ourShare = 0;
-            let lessorPayout = 0;
+        function renderTable() {
+            const tbody = document.getElementById('rentalsTableBody');
+            const emptyState = document.getElementById('emptyTableState');
+            if (!tbody) return;
 
-            rentalsData.forEach(r => {
-                if (r.status === 'Active') activeCount++;
-                if (r.status === 'Overdue') overdueCount++;
-
-                totalRevenue += r.totalCustomerPrice || 0;
-                ourShare += r.totalOurShare || 0;
-                lessorPayout += r.totalLessorShare || 0;
-            });
-
-            document.getElementById('kpiActiveRentals').textContent = activeCount;
-            document.getElementById('kpiOverdue').textContent = overdueCount;
-            document.getElementById('kpiTotalRevenue').textContent = `₱${totalRevenue.toLocaleString()}`;
-            document.getElementById('kpiOurShare').textContent = `₱${ourShare.toLocaleString()}`;
-            document.getElementById('kpiLessorPayoutSub').textContent = `₱${lessorPayout.toLocaleString()} payout to lessors`;
-        }
-
-        function updateStatus(rentalId, newStatus) {
-            const rental = rentalsData.find(r => r.id === rentalId);
-            if (rental) {
-                rental.status = newStatus;
-                saveState();
-                updateKPIs();
-                filterTable();
-                renderInventoryGrid();
-                renderLessorsGrid();
-                showToast(`Rental status updated to ${newStatus}`, "info");
-            }
-        }
-
-        function updatePaymentStatus(rentalId, newStatus) {
-            const rental = rentalsData.find(r => r.id === rentalId);
-            if (rental) {
-                rental.paymentStatus = newStatus;
-                saveState();
-                filterTable();
-                showToast(`Payment status updated to ${newStatus}`, "success");
-            }
-        }
-
-        function deleteRental(rentalId) {
-            rentalsData = rentalsData.filter(r => r.id !== rentalId);
-            saveState();
-            updateKPIs();
-            filterTable();
-            renderInventoryGrid();
-            renderLessorsGrid();
-            showToast("Rental record deleted.", "info");
-        }
-
-        function filterTable() {
             const searchVal = (document.getElementById('searchInput')?.value || '').toLowerCase();
             const statusVal = document.getElementById('statusFilter')?.value || 'ALL';
             const paymentVal = document.getElementById('paymentFilter')?.value || 'ALL';
 
             const filtered = rentalsData.filter(r => {
-                const matchesSearch = (r.customer || '').toLowerCase().includes(searchVal) || 
-                                      (r.items || '').toLowerCase().includes(searchVal) || 
-                                      (r.notes || '').toLowerCase().includes(searchVal) ||
-                                      (r.lessorName || '').toLowerCase().includes(searchVal);
+                const matchesSearch = r.customerName.toLowerCase().includes(searchVal) ||
+                                      (r.notes && r.notes.toLowerCase().includes(searchVal)) ||
+                                      r.lessorSource.toLowerCase().includes(searchVal);
                 const matchesStatus = statusVal === 'ALL' || r.status === statusVal;
                 const matchesPayment = paymentVal === 'ALL' || r.paymentStatus === paymentVal;
                 return matchesSearch && matchesStatus && matchesPayment;
             });
 
-            renderRentalsTable(filtered);
-        }
-
-        function renderRentalsTable(data) {
-            const tbody = document.getElementById('rentalsTableBody');
-            const emptyState = document.getElementById('emptyTableState');
-
-            if (!tbody) return;
-            tbody.innerHTML = '';
-
-            if (data.length === 0) {
+            if (filtered.length === 0) {
+                tbody.innerHTML = '';
                 if (emptyState) emptyState.classList.remove('hidden');
+                refreshIcons();
                 return;
-            } else {
-                if (emptyState) emptyState.classList.add('hidden');
             }
 
-            data.forEach(r => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800';
+            if (emptyState) emptyState.classList.add('hidden');
 
-                let lessorBadgeClass = "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
-                if (r.lessorType === "Partner Business") lessorBadgeClass = "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60";
-                else if (r.lessorType === "Individual Lessor") lessorBadgeClass = "bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800/60";
+            tbody.innerHTML = filtered.map(r => {
+                const itemsStr = Object.entries(r.items || {})
+                    .filter(([_, qty]) => qty > 0)
+                    .map(([name, qty]) => `<span class="inline-block bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded text-[11px] font-medium mr-1 mb-1">${name} x${qty}</span>`)
+                    .join('');
 
-                const paymentBadge = r.paymentStatus === 'Paid' 
-                    ? `<button onclick="updatePaymentStatus(${r.id}, 'Unpaid')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 cursor-pointer">Paid</button>`
-                    : `<button onclick="updatePaymentStatus(${r.id}, 'Paid')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 cursor-pointer">Unpaid</button>`;
+                let statusBadgeClass = 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20';
+                if (r.status === 'Overdue') statusBadgeClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+                if (r.status === 'Returned') statusBadgeClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
+                if (r.status === 'Damaged') statusBadgeClass = 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
 
-                const notesDisplay = r.notes ? `<span class="block text-[11px] text-slate-400 dark:text-slate-400 italic mt-0.5"><i data-lucide="notebook" class="w-3 h-3 inline mr-1"></i>${r.notes}</span>` : '';
+                let sourceBadge = `<span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md font-semibold text-[10px]">${r.lessorSource}</span>`;
+                if (r.lessorSource.startsWith('Individual:')) {
+                    sourceBadge = `<span class="px-2 py-0.5 bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 rounded-md font-bold text-[10px]">${r.lessorSource}</span>`;
+                } else if (r.lessorType === 'Partner Business') {
+                    sourceBadge = `<span class="px-2 py-0.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded-md font-bold text-[10px]">${r.lessorSource}</span>`;
+                }
 
-                tr.innerHTML = `
-                    <td class="py-3.5 px-4 sm:px-5 font-bold text-slate-900 dark:text-white">
-                        <div>${r.customer || '-'}</div>
-                        ${notesDisplay}
-                    </td>
-                    <td class="py-3.5 px-4 sm:px-5 font-medium text-slate-700 dark:text-slate-300">${r.items || '-'}</td>
-                    <td class="py-3.5 px-4 sm:px-5">
-                        <span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-lg border ${lessorBadgeClass}">
-                            ${r.lessorName || 'In-House'}
-                        </span>
-                    </td>
-                    <td class="py-3.5 px-4 sm:px-5 font-medium text-slate-600 dark:text-slate-400">${r.deposit || '-'}</td>
-                    <td class="py-3.5 px-4 sm:px-5 font-bold text-slate-900 dark:text-white">₱${(r.totalCustomerPrice || 0).toLocaleString()}</td>
-                    <td class="py-3.5 px-4 sm:px-5 font-bold text-teal-600 dark:text-teal-400">₱${(r.totalOurShare || 0).toLocaleString()}</td>
-                    <td class="py-3.5 px-4 sm:px-5">${paymentBadge}</td>
-                    <td class="py-3.5 px-4 sm:px-5">
-                        <select onchange="updateStatus(${r.id}, this.value)" class="text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 font-semibold focus:outline-none focus:border-teal-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">
-                            <option value="Active" ${r.status === 'Active' ? 'selected' : ''}>Active</option>
-                            <option value="Overdue" ${r.status === 'Overdue' ? 'selected' : ''}>Overdue</option>
-                            <option value="Returned" ${r.status === 'Returned' ? 'selected' : ''}>Returned</option>
-                            <option value="Damaged" ${r.status === 'Damaged' ? 'selected' : ''}>Damaged</option>
-                        </select>
-                    </td>
-                    <td class="py-3.5 px-4 sm:px-5 text-right space-x-1 whitespace-nowrap">
-                        <button onclick="openAddGearModal(${r.id})" class="px-2.5 py-1 bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900 text-teal-700 dark:text-teal-300 font-bold rounded-lg text-[11px] border border-teal-200 dark:border-teal-800/60 transition cursor-pointer" title="Add More Gear">
-                            + Gear
-                        </button>
-                        <button onclick="deleteRental(${r.id})" class="px-2 py-1 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-600 dark:text-rose-400 rounded-lg text-[11px] border border-rose-200 dark:border-rose-800/60 transition cursor-pointer" title="Delete Record">
-                            <i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i>
-                        </button>
-                    </td>
+                const paymentBadgeClass = r.paymentStatus === 'Paid' 
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' 
+                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+
+                return `
+                    <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td class="py-3.5 px-4 sm:px-5 font-semibold text-slate-900 dark:text-white">
+                            <div>${r.customerName}</div>
+                            ${r.notes ? `<div class="text-[10px] font-normal text-slate-400 italic mt-0.5">${r.notes}</div>` : ''}
+                            <div class="text-[10px] font-normal text-slate-400">Due: ${r.dueTime}</div>
+                        </td>
+                        <td class="py-3.5 px-4 sm:px-5">${itemsStr || 'None'}</td>
+                        <td class="py-3.5 px-4 sm:px-5">${sourceBadge}</td>
+                        <td class="py-3.5 px-4 sm:px-5 font-medium text-slate-600 dark:text-slate-300">${r.depositHeld}</td>
+                        <td class="py-3.5 px-4 sm:px-5 font-bold text-slate-900 dark:text-white">₱${r.totalPrice.toLocaleString()}</td>
+                        <td class="py-3.5 px-4 sm:px-5 font-bold text-teal-600 dark:text-teal-400">₱${r.ourShare.toLocaleString()}</td>
+                        <td class="py-3.5 px-4 sm:px-5">
+                            <select onchange="updatePaymentStatus(${r.id}, this.value)" class="text-[10px] font-bold px-2 py-1 rounded-lg border focus:outline-none ${paymentBadgeClass}">
+                                <option value="Paid" ${r.paymentStatus === 'Paid' ? 'selected' : ''}>Paid</option>
+                                <option value="Unpaid" ${r.paymentStatus === 'Unpaid' ? 'selected' : ''}>Unpaid</option>
+                            </select>
+                        </td>
+                        <td class="py-3.5 px-4 sm:px-5">
+                            <select onchange="updateStatus(${r.id}, this.value)" class="text-[10px] font-bold px-2 py-1 rounded-lg border focus:outline-none ${statusBadgeClass}">
+                                <option value="Active" ${r.status === 'Active' ? 'selected' : ''}>Active</option>
+                                <option value="Returned" ${r.status === 'Returned' ? 'selected' : ''}>Returned</option>
+                                <option value="Overdue" ${r.status === 'Overdue' ? 'selected' : ''}>Overdue</option>
+                                <option value="Damaged" ${r.status === 'Damaged' ? 'selected' : ''}>Damaged</option>
+                            </select>
+                        </td>
+                        <td class="py-3.5 px-4 sm:px-5 text-right space-x-1">
+                            <button onclick="openAddGearModal(${r.id})" class="px-2 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 rounded-lg text-[10px] font-bold transition cursor-pointer" title="Add Additional Gear">
+                                + Gear
+                            </button>
+                            <button onclick="deleteRental(${r.id})" class="p-1 text-slate-400 hover:text-rose-500 transition cursor-pointer" title="Delete Transaction">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    </tr>
                 `;
-                tbody.appendChild(tr);
-            });
+            }).join('');
 
-            if (window.lucide) lucide.createIcons();
+            refreshIcons();
+        }
+
+        function updateStatus(id, newStatus) {
+            const rental = rentalsData.find(r => r.id === id);
+            if (rental) {
+                rental.status = newStatus;
+                saveState();
+                renderTable();
+                updateKPIs();
+                showToast(`Updated transaction status for ${rental.customerName} to ${newStatus}`, "info");
+            }
+        }
+
+        function updatePaymentStatus(id, newPaymentStatus) {
+            const rental = rentalsData.find(r => r.id === id);
+            if (rental) {
+                rental.paymentStatus = newPaymentStatus;
+                saveState();
+                renderTable();
+                updateKPIs();
+                showToast(`Payment for ${rental.customerName} set to ${newPaymentStatus}`, "info");
+            }
+        }
+
+        function deleteRental(id) {
+            rentalsData = rentalsData.filter(r => r.id !== id);
+            saveState();
+            renderTable();
+            updateKPIs();
+            showToast("Rental record deleted.", "info");
+        }
+
+        function filterTable() {
+            renderTable();
+        }
+
+        function updateKPIs() {
+            const activeCount = rentalsData.filter(r => r.status === 'Active').length;
+            const overdueCount = rentalsData.filter(r => r.status === 'Overdue').length;
+
+            const totalRev = rentalsData.reduce((acc, r) => acc + (r.totalPrice || 0), 0);
+            const ourShare = rentalsData.reduce((acc, r) => acc + (r.ourShare || 0), 0);
+            const lessorShare = rentalsData.reduce((acc, r) => acc + (r.lessorShare || 0), 0);
+
+            const activeEl = document.getElementById('kpiActiveRentals');
+            const overdueEl = document.getElementById('kpiOverdue');
+            const totalRevEl = document.getElementById('kpiTotalRevenue');
+            const ourShareEl = document.getElementById('kpiOurShare');
+            const subPayoutEl = document.getElementById('kpiLessorPayoutSub');
+
+            if (activeEl) activeEl.textContent = activeCount;
+            if (overdueEl) overdueEl.textContent = overdueCount;
+            if (totalRevEl) totalRevEl.textContent = `₱${totalRev.toLocaleString()}`;
+            if (ourShareEl) ourShareEl.textContent = `₱${ourShare.toLocaleString()}`;
+            if (subPayoutEl) subPayoutEl.textContent = `₱${lessorShare.toLocaleString()} payout to lessors`;
         }
 
         function renderInventoryGrid() {
-            const container = document.getElementById('inventoryGrid');
-            if (!container) return;
+            const grid = document.getElementById('inventoryGrid');
+            if (!grid) return;
 
-            const activeOut = { "Mask": 0, "Short Fins": 0, "Long Fins": 0, "Lifevest": 0, "GoPro": 0, "Floater": 0 };
-            rentalsData.forEach(r => {
-                if (r.status === 'Active' || r.status === 'Overdue') {
-                    if (r.itemQuantities) {
-                        Object.keys(activeOut).forEach(k => {
-                            activeOut[k] += r.itemQuantities[k] || 0;
-                        });
-                    }
-                }
+            const outCounts = {};
+            rentalsData.filter(r => r.status === 'Active' || r.status === 'Overdue').forEach(r => {
+                Object.entries(r.items || {}).forEach(([code, qty]) => {
+                    outCounts[code] = (outCounts[code] || 0) + qty;
+                });
             });
 
-            container.innerHTML = '';
-            gearStockDirectory.forEach(item => {
-                const outCount = activeOut[item.code] || 0;
-                const available = Math.max(0, item.totalStock - outCount);
+            grid.innerHTML = gearStockDirectory.map(item => {
+                const rentedOut = outCounts[item.code] || 0;
+                const available = Math.max(0, item.totalStock - rentedOut);
+                const percentAvailable = Math.round((available / item.totalStock) * 100);
 
-                const card = document.createElement('div');
-                card.className = 'bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between space-y-3';
-                card.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="p-2.5 bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 rounded-xl">
-                                <i data-lucide="${item.icon}" class="w-5 h-5"></i>
+                return `
+                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between space-y-4">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="p-2.5 bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 rounded-xl">
+                                    <i data-lucide="${item.icon}" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-slate-900 dark:text-white text-sm">${item.name}</h4>
+                                    <span class="text-[11px] text-slate-400">Total Stock: ${item.totalStock} units</span>
+                                </div>
                             </div>
-                            <div>
-                                <h4 class="font-bold text-slate-900 dark:text-white text-sm">${item.name}</h4>
-                                <span class="text-[11px] text-slate-400">Total Registered: ${item.totalStock}</span>
+                            <span class="text-xs font-extrabold px-2.5 py-1 rounded-lg ${available > 10 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'}">
+                                ${available} Available
+                            </span>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-[11px] font-semibold mb-1">
+                                <span class="text-slate-500 dark:text-slate-400">Rented Out: ${rentedOut}</span>
+                                <span class="text-slate-700 dark:text-slate-300">${percentAvailable}% Stock Free</span>
                             </div>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-                        <div class="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl text-center">
-                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Currently Rented</span>
-                            <span class="text-base font-extrabold text-amber-600 dark:text-amber-400">${outCount}</span>
-                        </div>
-                        <div class="bg-teal-50 dark:bg-teal-950/50 p-2.5 rounded-xl text-center">
-                            <span class="text-[10px] text-teal-700 dark:text-teal-400 uppercase font-bold block">In Stock</span>
-                            <span class="text-base font-extrabold text-teal-700 dark:text-teal-400">${available}</span>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div class="bg-teal-500 h-full rounded-full transition-all duration-300" style="width: ${percentAvailable}%"></div>
+                            </div>
                         </div>
                     </div>
                 `;
-                container.appendChild(card);
-            });
+            }).join('');
 
-            if (window.lucide) lucide.createIcons();
+            refreshIcons();
         }
 
         function renderLessorsGrid() {
-            const container = document.getElementById('lessorsGrid');
-            if (!container) return;
+            const grid = document.getElementById('lessorsGrid');
+            if (!grid) return;
 
-            container.innerHTML = '';
-            lessorsDirectory.forEach(lessor => {
-                const activeCount = rentalsData.filter(r => (r.status === 'Active' || r.status === 'Overdue') && r.lessorName === lessor.name).length;
+            if (lessorsDirectory.length === 0) {
+                grid.innerHTML = `<p class="text-xs text-slate-400 col-span-3">No registered third-party lessors yet.</p>`;
+                return;
+            }
 
-                const isPartner = lessor.type === 'Partner Business';
-                const typeBadge = isPartner 
-                    ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">Partner Business</span>`
-                    : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">Individual Lessor</span>`;
+            grid.innerHTML = lessorsDirectory.map(l => {
+                const activeCount = rentalsData.filter(r => 
+                    (r.status === 'Active' || r.status === 'Overdue') && 
+                    (r.lessorSource === l.name || r.lessorSource === `Individual: ${l.name}`)
+                ).length;
 
-                const card = document.createElement('div');
-                card.className = 'bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between space-y-3';
-                card.innerHTML = `
-                    <div>
+                const isPartner = l.type === 'Partner Business';
+                const badgeClass = isPartner 
+                    ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' 
+                    : 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20';
+
+                return `
+                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between space-y-4">
                         <div class="flex items-start justify-between">
                             <div>
-                                <h4 class="font-bold text-slate-900 dark:text-white text-sm">${lessor.name}</h4>
-                                <p class="text-xs text-slate-400 mt-0.5">${lessor.location || 'Station'}</p>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}">${l.type}</span>
+                                <h4 class="font-bold text-slate-900 dark:text-white text-base mt-2">${l.name}</h4>
+                                <p class="text-xs text-slate-400">${l.location || 'Station Base'}</p>
                             </div>
-                            ${typeBadge}
+                            <div class="flex items-center space-x-1">
+                                <button onclick="openEditLessorModal(${l.id})" class="p-1.5 text-slate-400 hover:text-teal-500 transition cursor-pointer" title="Edit Lessor">
+                                    <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="deleteLessor(${l.id})" class="p-1.5 text-slate-400 hover:text-rose-500 transition cursor-pointer" title="Delete Lessor">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div class="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300">
-                            <p class="flex items-center space-x-1.5">
-                                <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i>
-                                <span>${lessor.phone || 'N/A'}</span>
-                            </p>
-                            <p class="flex items-center space-x-1.5">
-                                <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-400"></i>
-                                <span>${lessor.commission || 'Standard Split'}</span>
-                            </p>
-                        </div>
-                    </div>
-                    <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                        <span class="text-slate-500 dark:text-slate-400 font-medium">${activeCount} Active Rental(s)</span>
-                        <div class="flex items-center space-x-1">
-                            <button onclick="openEditLessorModal(${lessor.id})" class="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition cursor-pointer" title="Edit Lessor">
-                                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
-                            </button>
-                            <button onclick="deleteLessor(${lessor.id})" class="p-1.5 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-600 dark:text-rose-400 rounded-lg transition cursor-pointer" title="Delete Lessor">
-                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                            </button>
+
+                        <div class="pt-3 border-t border-slate-100 dark:border-slate-800 text-xs space-y-1">
+                            <div class="flex justify-between text-slate-500 dark:text-slate-400">
+                                <span>Phone Contact:</span>
+                                <span class="font-medium text-slate-800 dark:text-slate-200">${l.phone || 'N/A'}</span>
+                            </div>
+                            <div class="flex justify-between text-slate-500 dark:text-slate-400">
+                                <span>Active Rental Gear Out:</span>
+                                <span class="font-bold text-teal-600 dark:text-teal-400">${activeCount} Order(s)</span>
+                            </div>
                         </div>
                     </div>
                 `;
-                container.appendChild(card);
-            });
+            }).join('');
 
-            if (window.lucide) lucide.createIcons();
+            refreshIcons();
         }
 
-        // PDF Export Handler
         function exportToPDF() {
             if (!window.jspdf) {
-                showToast("PDF generator loading, please try again in a moment.", "warning");
+                showToast("PDF Export library loading...", "info");
                 return;
             }
 
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const doc = new jsPDF();
 
-            doc.setFont("helvetica", "bold");
             doc.setFontSize(16);
-            doc.setTextColor(15, 23, 42);
-            doc.text("AquaTrack - Snorkeling Gear Rental Report", 14, 16);
+            doc.text("AquaTrack - Snorkeling Gear Rental Report", 14, 20);
+            doc.setFontSize(10);
+            doc.text(`Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 14, 26);
 
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(9);
-            doc.setTextColor(100, 116, 139);
-            doc.text(`Generated on: ${new Date().toLocaleString()}  |  Total Records: ${rentalsData.length}`, 14, 23);
-
-            let totalRev = 0, totalOur = 0, totalLessor = 0;
-            rentalsData.forEach(r => {
-                totalRev += r.totalCustomerPrice || 0;
-                totalOur += r.totalOurShare || 0;
-                totalLessor += r.totalLessorShare || 0;
-            });
-
-            doc.setFillColor(241, 245, 249);
-            doc.roundedRect(14, 26, 269, 12, 2, 2, 'F');
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(9);
-            doc.setTextColor(13, 148, 136);
-            doc.text(`TOTAL REVENUE: PHP ${totalRev.toLocaleString()}    |    OUR SHARE: PHP ${totalOur.toLocaleString()}    |    LESSOR PAYOUT: PHP ${totalLessor.toLocaleString()}`, 18, 33.5);
-
-            const tableData = rentalsData.map(r => [
-                r.customer || '-',
-                r.items || '-',
-                r.lessorName || 'In-House',
-                r.deposit || '-',
-                `PHP ${(r.totalCustomerPrice || 0).toLocaleString()}`,
-                `PHP ${(r.totalOurShare || 0).toLocaleString()}`,
-                r.paymentStatus || 'Unpaid',
-                r.status || 'Active',
-                r.notes || '-'
+            const tableColumn = ["Guest Name", "Gear Rented", "Source", "Deposit", "Total (₱)", "Our Share (₱)", "Payment", "Status"];
+            const tableRows = rentalsData.map(r => [
+                r.customerName,
+                Object.entries(r.items || {}).filter(([_, q]) => q > 0).map(([n, q]) => `${n} x${q}`).join(', '),
+                r.lessorSource,
+                r.depositHeld,
+                `₱${r.totalPrice}`,
+                `₱${r.ourShare}`,
+                r.paymentStatus,
+                r.status
             ]);
 
             doc.autoTable({
-                startY: 42,
-                head: [['Customer Name', 'Rented Items', 'Lessor Source', 'Deposit Held', 'Total Bill', 'Our Share', 'Payment', 'Status', 'Notes']],
-                body: tableData,
-                theme: 'striped',
-                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-                bodyStyles: { fontSize: 8, cellPadding: 2.5 },
-                alternateRowStyles: { fillColor: [248, 250, 252] }
+                head: [tableColumn],
+                body: tableRows,
+                startY: 32,
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [13, 148, 136] }
             });
 
-            doc.save(`AquaTrack_Rental_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
-            showToast("PDF Report exported successfully!", "success");
+            doc.save(`AquaTrack_Rental_Report_${Date.now()}.pdf`);
+            showToast("PDF report exported successfully!", "success");
         }
 
-        // Initial Load Event Hook
         window.onload = function() {
             loadSavedState();
-            if (window.lucide) lucide.createIcons();
-            populatePartnerDropdown();
+            renderTable();
             updateKPIs();
-            filterTable();
-            renderInventoryGrid();
-            renderLessorsGrid();
+            populatePartnerDropdown();
+            refreshIcons();
         };

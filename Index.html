@@ -25,8 +25,8 @@
         }
     </script>
     
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Lucide Icons (Universal Script) -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
 
     <!-- jsPDF & AutoTable for PDF Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -54,7 +54,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-base text-slate-900 dark:text-white tracking-wide">Tracktify</h1>
-                    <p class="text-[11px] text-teal-600 dark:text-teal-400 font-medium">Rental Hub By Franze</p>
+                    <p class="text-[11px] text-teal-600 dark:text-teal-400 font-medium">Rental Hub by Franze</p>
                 </div>
             </div>
         </div>
@@ -344,10 +344,10 @@
                     </label>
                 </div>
 
-                <!-- Customer Name -->
-                <div>
+                <!-- Customer Name Container -->
+                <div id="customerNameContainer">
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Customer / Guest Full Name *</label>
-                    <input type="text" id="customerName" required placeholder="e.g. Maria Santos" class="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-teal-500 dark:text-white transition">
+                    <input type="text" id="customerName" placeholder="e.g. Maria Santos" class="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-teal-500 dark:text-white transition">
                 </div>
 
                 <!-- Rental Notes / Instructions -->
@@ -359,14 +359,14 @@
                 <!-- SELECT GEAR ITEMS (All default to 0) -->
                 <div>
                     <div class="flex items-center justify-between mb-1">
-                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Select Gear Items & Quantities *</label>
+                        <label id="gearSectionTitle" class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Select Gear Items & Quantities *</label>
                         <span class="text-[10px] text-teal-600 dark:text-teal-400 font-semibold bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 rounded">3-Item Bundle Rule</span>
                     </div>
                     
                     <div class="space-y-2 bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
                         
                         <!-- Mask -->
-                        <div class="flex items-center justify-between">
+                        <div id="row-Mask" class="flex items-center justify-between">
                             <label class="flex items-center space-x-2 cursor-pointer">
                                 <input type="checkbox" id="chk-Mask" onchange="handleCheckboxChange('Mask')" class="rounded text-teal-600 focus:ring-teal-500">
                                 <div>
@@ -378,7 +378,7 @@
                         </div>
 
                         <!-- Short Fins -->
-                        <div class="flex items-center justify-between">
+                        <div id="row-Short Fins" class="flex items-center justify-between">
                             <label class="flex items-center space-x-2 cursor-pointer">
                                 <input type="checkbox" id="chk-Short Fins" onchange="handleCheckboxChange('Short Fins')" class="rounded text-teal-600 focus:ring-teal-500">
                                 <div>
@@ -390,7 +390,7 @@
                         </div>
 
                         <!-- Long Fins -->
-                        <div class="flex items-center justify-between">
+                        <div id="row-Long Fins" class="flex items-center justify-between">
                             <label class="flex items-center space-x-2 cursor-pointer">
                                 <input type="checkbox" id="chk-Long Fins" onchange="handleCheckboxChange('Long Fins')" class="rounded text-teal-600 focus:ring-teal-500">
                                 <div>
@@ -402,7 +402,7 @@
                         </div>
 
                         <!-- Lifevest -->
-                        <div class="flex items-center justify-between">
+                        <div id="row-Lifevest" class="flex items-center justify-between">
                             <label class="flex items-center space-x-2 cursor-pointer">
                                 <input type="checkbox" id="chk-Lifevest" onchange="handleCheckboxChange('Lifevest')" class="rounded text-teal-600 focus:ring-teal-500">
                                 <div>
@@ -414,7 +414,7 @@
                         </div>
 
                         <!-- GoPro -->
-                        <div class="flex items-center justify-between">
+                        <div id="row-GoPro" class="flex items-center justify-between">
                             <label class="flex items-center space-x-2 cursor-pointer">
                                 <input type="checkbox" id="chk-GoPro" onchange="handleCheckboxChange('GoPro')" class="rounded text-teal-600 focus:ring-teal-500">
                                 <div>
@@ -426,7 +426,7 @@
                         </div>
 
                         <!-- Floater -->
-                        <div class="flex items-center justify-between">
+                        <div id="row-Floater" class="flex items-center justify-between">
                             <label class="flex items-center space-x-2 cursor-pointer">
                                 <input type="checkbox" id="chk-Floater" onchange="handleCheckboxChange('Floater')" class="rounded text-teal-600 focus:ring-teal-500">
                                 <div>
@@ -468,7 +468,7 @@
                 <!-- LESSOR / GEAR SOURCE SELECTOR -->
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Lessor / Gear Source Type *</label>
-                    <div class="grid grid-cols-3 gap-2 text-xs">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                         <label class="flex items-center space-x-1.5 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer">
                             <input type="radio" name="lessorTypeRadio" value="In-House" checked onchange="toggleLessorFields()" class="text-teal-600">
                             <span class="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">In-House</span>
@@ -481,7 +481,67 @@
                             <input type="radio" name="lessorTypeRadio" value="Individual Lessor" onchange="toggleLessorFields()" class="text-teal-600">
                             <span class="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">Freelance Guide</span>
                         </label>
+                        <label class="flex items-center space-x-1.5 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer">
+                            <input type="radio" name="lessorTypeRadio" value="Travel Agency" onchange="toggleLessorFields()" class="text-teal-600">
+                            <span class="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">Travel Agency</span>
+                        </label>
                     </div>
+                </div>
+
+                <!-- IN-HOUSE PACKAGE OPTION CONTAINER -->
+                <div id="inHousePackageContainer" class="p-3 bg-teal-50/80 dark:bg-teal-950/50 rounded-xl border border-teal-200 dark:border-teal-800/60 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-teal-800 dark:text-teal-300">In-House Transaction Mode</label>
+                        <span class="text-[10px] font-bold bg-teal-200 dark:bg-teal-900 text-teal-900 dark:text-teal-200 px-2 py-0.5 rounded-full">In-House Special</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <label class="flex items-center space-x-1.5 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer">
+                            <input type="radio" name="inHouseModeRadio" value="Standard" checked onchange="toggleInHouseMode()" class="text-teal-600">
+                            <span class="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">Itemized Gear Only</span>
+                        </label>
+                        <label class="flex items-center space-x-1.5 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer">
+                            <input type="radio" name="inHouseModeRadio" value="Package" onchange="toggleInHouseMode()" class="text-teal-600">
+                            <span class="font-bold text-teal-700 dark:text-teal-400 text-[11px]">₱500/Head Package</span>
+                        </label>
+                    </div>
+
+                    <!-- Package Details & Pax Input -->
+                    <div id="packageDetailsBox" class="hidden pt-2 border-t border-teal-200/80 dark:border-teal-800/80 space-y-2">
+                        <div class="flex items-center justify-between bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-teal-200 dark:border-teal-800">
+                            <div>
+                                <span class="font-bold text-xs text-slate-800 dark:text-slate-100 block">₱500 Tour Package / Head</span>
+                                <span class="text-[10px] text-teal-600 dark:text-teal-400 font-medium block">Includes: Mask + Lifevest + Guide + Env Fee</span>
+                            </div>
+                            <div class="flex items-center space-x-1.5">
+                                <label class="text-[11px] font-bold text-slate-600 dark:text-slate-300">Pax:</label>
+                                <input type="number" id="paxCount" min="1" max="50" value="1" oninput="calculateModalPreview()" class="w-14 px-2 py-1 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded text-right font-bold dark:text-white">
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                            * Masks & Lifevests are automatically included per guest. Select optional Short/Long Fins or GoPro add-ons below.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- TRAVEL AGENCY CONTAINER -->
+                <div id="travelAgencyContainer" class="hidden p-3 bg-indigo-50/80 dark:bg-indigo-950/50 rounded-xl border border-indigo-200 dark:border-indigo-800/60 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-indigo-800 dark:text-indigo-300">Third-Party Travel Agency Rate</label>
+                        <span id="agencyRateBadge" class="text-[10px] font-bold bg-indigo-200 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-200 px-2 py-0.5 rounded-full">₱350/head (&lt;5 pax)</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold text-indigo-800 dark:text-indigo-300 mb-0.5">Agency Name *</label>
+                            <input type="text" id="agencyNameInput" placeholder="e.g. Island Hopping Tours" class="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 rounded-lg dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-indigo-800 dark:text-indigo-300 mb-0.5">Guest Pax Count *</label>
+                            <input type="number" id="agencyPaxCount" min="1" max="100" value="1" oninput="calculateModalPreview()" class="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 rounded-lg dark:text-white font-bold text-right">
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">
+                        * Pricing: ₱350/head for 1–4 guests | ₱300/head for 5+ guests. Basic gear included. Select optional Short/Long Fins or GoPro add-ons.
+                    </p>
                 </div>
 
                 <!-- Dynamic Lessor Name Dropdown / Input -->
@@ -509,11 +569,12 @@
                     </div>
                 </div>
 
-                <!-- Deposit Held & Due Time -->
-                <div class="grid grid-cols-2 gap-3">
+                <!-- Deposit Held & Due Time Container -->
+                <div id="depositAndDueContainer" class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Deposit Held *</label>
                         <select id="depositHeld" class="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-teal-500 dark:text-white">
+                            <option value="None / Included">None / Included</option>
                             <option value="Passport">Passport</option>
                             <option value="₱1,000 Cash Deposit">₱1,000 Cash Deposit</option>
                             <option value="₱500 Cash Deposit">₱500 Cash Deposit</option>
@@ -525,7 +586,7 @@
 
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Return Due Time *</label>
-                        <input type="time" id="dueTime" required value="17:00" class="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-teal-500 dark:text-white">
+                        <input type="time" id="dueTime" value="17:00" class="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-teal-500 dark:text-white">
                     </div>
                 </div>
 
@@ -806,5 +867,6 @@
     </div>
 
     <script src="main.js"></script>
-</body>
+
+    </body>
 </html>
