@@ -180,7 +180,7 @@
         }
 
         function switchTab(tabName) {
-            ['dashboard', 'inventory', 'lessors'].forEach(t => {
+            ['dashboard', 'inventory', 'active-rentals', 'lessors'].forEach(t => {
                 const view = document.getElementById(`view-${t}`);
                 const nav = document.getElementById(`nav-${t}`);
                 const dock = document.getElementById(`dock-${t}`);
@@ -214,10 +214,12 @@
             if (pageTitle) {
                 if (tabName === 'dashboard') pageTitle.textContent = "Rental Dashboard";
                 else if (tabName === 'inventory') pageTitle.textContent = "Gear Inventory Stock";
+                else if (tabName === 'active-rentals') pageTitle.textContent = "Active Rentals";
                 else if (tabName === 'lessors') pageTitle.textContent = "Lessors Directory";
             }
 
             if (tabName === 'inventory') renderInventoryGrid();
+            if (tabName === 'active-rentals') renderActiveRentals();
             if (tabName === 'lessors') renderLessorsGrid();
 
             refreshIcons();
@@ -682,6 +684,7 @@
             saveState();
             closeAddGearModal();
             renderTable();
+            renderActiveRentals();
             updateKPIs();
             showToast(`Successfully added ${addedCount} item(s) to ${rental.customerName}'s order!`, "success");
         }
@@ -804,6 +807,7 @@
             saveState();
             closeRentalModal();
             renderTable();
+            renderActiveRentals();
             updateKPIs();
             showToast(`Rental order issued successfully for ${customerName}!`, "success");
         }
@@ -884,7 +888,53 @@
             showToast(`Removed lessor ${lessor.name}`, "info");
         }
 
+        function renderReturnsToday() {
+            const list = document.getElementById('returnsTodayList');
+            const count = document.getElementById('returnsTodayCount');
+            if (!list || !count) return;
+            const formatTime12Hour = time => {
+                const match = /^(\d{1,2}):(\d{2})$/.exec(time || '');
+                if (!match) return time || '—';
+                const hour = Number(match[1]);
+                const minute = Number(match[2]);
+                if (hour > 23 || minute > 59) return time;
+                return `${hour % 12 || 12}:${match[2]} ${hour >= 12 ? 'PM' : 'AM'}`;
+            };
+
+            // Rentals use a return time without a separate due date, so every
+            // currently checked-out rental is treated as due today.
+            const expectedReturns = rentalsData
+                .filter(r => r.status === 'Active' || r.status === 'Overdue')
+                .sort((a, b) => (a.dueTime || '99:99').localeCompare(b.dueTime || '99:99'));
+
+            count.textContent = `${expectedReturns.length} expected`;
+            if (expectedReturns.length === 0) {
+                list.innerHTML = '<p class="py-5 text-center text-xs text-slate-400">No rentals expected to return today.</p>';
+                return;
+            }
+
+            list.innerHTML = expectedReturns.map((r, index) => {
+                const itemCount = Object.values(r.items || {}).reduce((sum, quantity) => sum + (Number(quantity) || 0), 0);
+                const dotClass = r.status === 'Overdue'
+                    ? 'bg-amber-500'
+                    : index === 0 ? 'bg-cyan-500' : 'bg-slate-200 dark:bg-slate-700';
+                const rowClass = index === 0
+                    ? 'bg-slate-50 dark:bg-slate-800/60'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/40';
+                return `
+                    <div class="grid grid-cols-[68px_minmax(0,1fr)_12px] items-center min-h-[56px] rounded-xl ${rowClass}">
+                        <div class="px-2 text-center text-xs font-medium ${r.status === 'Overdue' ? 'text-amber-600 dark:text-amber-400' : 'text-teal-700 dark:text-teal-300'}">${formatTime12Hour(r.dueTime)}</div>
+                        <div class="min-w-0 border-l border-slate-100 dark:border-slate-700 px-3 py-2">
+                            <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">${r.customerName}</p>
+                            <p class="text-[11px] text-slate-400">${itemCount} ${itemCount === 1 ? 'item' : 'items'}</p>
+                        </div>
+                        <span class="mr-3 h-2 w-2 rounded-full ${dotClass}" aria-label="${r.status}"></span>
+                    </div>`;
+            }).join('');
+        }
+
         function renderTable() {
+            renderReturnsToday();
             const tbody = document.getElementById('rentalsTableBody');
             const emptyState = document.getElementById('emptyTableState');
             if (!tbody) return;
@@ -974,12 +1024,61 @@
             refreshIcons();
         }
 
+        function renderActiveRentals() {
+            const activeBody = document.getElementById('activeRentalsTableBody');
+            const returnedBody = document.getElementById('returnedRentalsTableBody');
+            if (!activeBody || !returnedBody) return;
+
+            const activeRentals = rentalsData.filter(r => r.status === 'Active' || r.status === 'Overdue');
+            const returnedRentals = rentalsData.filter(r => r.status === 'Returned');
+            const activeCount = document.getElementById('activeRentalsCount');
+            const returnedCount = document.getElementById('returnedRentalsCount');
+            if (activeCount) activeCount.textContent = activeRentals.length;
+            if (returnedCount) returnedCount.textContent = returnedRentals.length;
+
+            const gearList = rental => Object.entries(rental.items || {})
+                .filter(([_, qty]) => qty > 0)
+                .map(([name, qty]) => `<span class="inline-block px-2 py-0.5 mb-1 mr-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[11px]">${name} × ${qty}</span>`)
+                .join('') || '<span class="text-slate-400">None</span>';
+            const emptyRow = (colspan, message) => `<tr><td colspan="${colspan}" class="p-8 text-center text-xs text-slate-400">${message}</td></tr>`;
+
+            activeBody.innerHTML = activeRentals.length ? activeRentals.map(r => `
+                <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                    <td class="py-3 px-4 font-semibold text-slate-900 dark:text-white">${r.customerName}<div class="text-[10px] font-normal text-slate-400 mt-0.5">Due: ${r.dueTime || '—'}${r.notes ? ` · ${r.notes}` : ''}</div></td>
+                    <td class="py-3 px-4">${gearList(r)}</td>
+                    <td class="py-3 px-4">${r.lessorSource || '—'}</td>
+                    <td class="py-3 px-4 font-bold text-slate-900 dark:text-white">₱${Number(r.totalPrice || 0).toLocaleString()}</td>
+                    <td class="py-3 px-4">${r.paymentStatus || '—'}</td>
+                    <td class="py-3 px-4"><div class="flex items-center gap-2">
+                        <select aria-label="Rental status" onchange="updateStatus(${r.id}, this.value)" class="text-[10px] font-bold px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200">
+                            <option value="Active" ${r.status === 'Active' ? 'selected' : ''}>Active</option>
+                            <option value="Overdue" ${r.status === 'Overdue' ? 'selected' : ''}>Overdue</option>
+                            <option value="Returned">Returned</option>
+                            <option value="Damaged">Damaged</option>
+                        </select>
+                        <button onclick="openAddGearModal(${r.id})" class="px-2 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 rounded-lg text-[10px] font-bold cursor-pointer">+ Gear</button>
+                    </div></td>
+                </tr>`).join('') : emptyRow(6, 'No active or overdue rentals.');
+
+            returnedBody.innerHTML = returnedRentals.length ? returnedRentals.map(r => `
+                <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                    <td class="py-3 px-4 font-semibold text-slate-900 dark:text-white">${r.customerName}${r.notes ? `<div class="text-[10px] font-normal text-slate-400 mt-0.5">${r.notes}</div>` : ''}</td>
+                    <td class="py-3 px-4">${gearList(r)}</td>
+                    <td class="py-3 px-4">${r.lessorSource || '—'}</td>
+                    <td class="py-3 px-4 font-bold text-slate-900 dark:text-white">₱${Number(r.totalPrice || 0).toLocaleString()}</td>
+                    <td class="py-3 px-4">${r.paymentStatus || '—'}</td>
+                    <td class="py-3 px-4"><span class="inline-block px-2 py-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">Returned</span></td>
+                </tr>`).join('') : emptyRow(6, 'No returned items yet.');
+            refreshIcons();
+        }
+
         function updateStatus(id, newStatus) {
             const rental = rentalsData.find(r => r.id === id);
             if (rental) {
                 rental.status = newStatus;
                 saveState();
                 renderTable();
+                renderActiveRentals();
                 updateKPIs();
                 showToast(`Updated transaction status for ${rental.customerName} to ${newStatus}`, "info");
             }
@@ -991,6 +1090,7 @@
                 rental.paymentStatus = newPaymentStatus;
                 saveState();
                 renderTable();
+                renderActiveRentals();
                 updateKPIs();
                 showToast(`Payment for ${rental.customerName} set to ${newPaymentStatus}`, "info");
             }
@@ -1000,6 +1100,7 @@
             rentalsData = rentalsData.filter(r => r.id !== id);
             saveState();
             renderTable();
+            renderActiveRentals();
             updateKPIs();
             showToast("Rental record deleted.", "info");
         }
